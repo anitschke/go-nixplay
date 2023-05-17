@@ -3,6 +3,7 @@ package nixplay
 import (
 	"crypto/md5"
 	"encoding/hex"
+	"errors"
 	"fmt"
 )
 
@@ -11,6 +12,10 @@ type ContainerType string
 const (
 	AlbumContainerType    = ContainerType("album")
 	PlaylistContainerType = ContainerType("playlist")
+)
+
+var (
+	ErrInvalidContainerType = errors.New("invalid container type")
 )
 
 type MD5Hash [md5.Size]byte
