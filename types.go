@@ -36,7 +36,7 @@ type Container struct {
 	ContainerType ContainerType
 	Name          string
 	ID            uint64
-	PhotoCount    uint64 //xxx can I support this?
+	PhotoCount    uint64
 }
 
 // xxx doc

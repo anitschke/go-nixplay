@@ -13,6 +13,8 @@ func DoUnmarshalJSONResponse(client Client, request *http.Request, response any)
 	}
 	defer resp.Body.Close()
 
+	//xxx check response code
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
