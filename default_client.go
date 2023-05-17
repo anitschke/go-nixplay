@@ -3,9 +3,11 @@ package nixplay
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 
 	"github.com/anitschke/go-nixplay/auth"
 	"github.com/anitschke/go-nixplay/httpx"
@@ -85,12 +87,62 @@ func (c *DefaultClient) Container(ctx context.Context, containerType ContainerTy
 }
 
 func (c *DefaultClient) CreateContainer(ctx context.Context, containerType ContainerType, name string) (Container, error) {
-	panic("not implemented") // xxx: Implement
+	switch containerType {
+	case AlbumContainerType:
+		return c.createAlbum(ctx, name)
+	case PlaylistContainerType:
+		panic("not implemented") // xxx: Implement
+	default:
+		return Container{}, ErrInvalidContainerType
+	}
+}
+
+func (c *DefaultClient) createAlbum(ctx context.Context, name string) (Container, error) {
+	formData := url.Values{
+		"name": {name},
+	}
+	req, err := httpx.NewPostFormRequest(ctx, "https://api.nixplay.com/album/create/json/", formData)
+	if err != nil {
+		return Container{}, nil
+	}
+
+	var albums albumsResponse
+	if err := httpx.DoUnmarshalJSONResponse(c.authClient, req, &albums); err != nil {
+		return Container{}, err
+	}
+	if len(albums) != 1 {
+		return Container{}, errors.New("incorrect number of created containers returned")
+	}
+
+	return albums[0].ToContainer(), nil
 }
 
 func (c *DefaultClient) DeleteContainer(ctx context.Context, container Container) error {
-	panic("not implemented") // xxx: Implement
+	switch container.ContainerType {
+	case AlbumContainerType:
+		return c.deleteAlbum(ctx, container)
+	case PlaylistContainerType:
+		panic("not implemented") // xxx: Implement
+	default:
+		return ErrInvalidContainerType
+	}
 }
+
+func (c *DefaultClient) deleteAlbum(ctx context.Context, container Container) error {
+	url := fmt.Sprintf("https://api.nixplay.com/album/%d/delete/json/", container.ID)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, bytes.NewReader([]byte{}))
+	if err != nil {
+		return err
+	}
+	resp, err := c.authClient.Do(req)
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	return nil
+}
+
+// https://api.nixplay.com/album/9864711/delete/json/
 
 func (c *DefaultClient) Photos(ctx context.Context, container Container) ([]Photo, error) {
 	panic("not implemented") // xxx: Implement

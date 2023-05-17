@@ -101,12 +101,10 @@ func doAuth(ctx context.Context, client httpx.Client, authIn Authorization) (aut
 		"email":    {authIn.Username},
 		"password": {authIn.Password},
 	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, loginURL, strings.NewReader(loginForm.Encode()))
+	req, err := httpx.NewPostFormRequest(ctx, loginURL, loginForm)
 	if err != nil {
-		return auth{}, fmt.Errorf("failed to create log in request: %w", err)
+		return auth{}, nil
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := client.Do(req)
 	if err != nil {
