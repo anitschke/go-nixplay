@@ -13,7 +13,8 @@ import (
 )
 
 func TestAuthorizedClient_LoginPass(t *testing.T) {
-	auth := MustTestAccountAuth()
+	auth, err := TestAccountAuth()
+	assert.NoError(t, err)
 	client := http.Client{}
 	authClient, err := NewAuthorizedClient(context.Background(), &client, auth)
 	assert.NoError(t, err)
@@ -52,7 +53,8 @@ func TestAuthorizedClient_SendRequest(t *testing.T) {
 	// because we expect the "old_username" property to be
 	// "${testUsername@nixplay.com}"
 
-	auth := MustTestAccountAuth()
+	auth, err := TestAccountAuth()
+	assert.NoError(t, err)
 	client := http.Client{}
 	authClient, err := NewAuthorizedClient(context.Background(), &client, auth)
 	require.NoError(t, err)

@@ -1,8 +1,10 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 )
 
@@ -34,10 +36,18 @@ func TestAccountAuth() (Authorization, error) {
 	}, err
 }
 
-func MustTestAccountAuth() Authorization {
+func NewDefaultTestAuthorizedClient() (*AuthorizedClient, error) {
 	auth, err := TestAccountAuth()
+	if err != nil {
+		return nil, err
+	}
+	client := http.Client{}
+	return NewAuthorizedClient(context.Background(), &client, auth)
+}
+
+func Must(client *AuthorizedClient, err error) *AuthorizedClient {
 	if err != nil {
 		panic(err)
 	}
-	return auth
+	return client
 }
