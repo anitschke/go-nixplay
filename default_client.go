@@ -491,12 +491,47 @@ func (c *DefaultClient) uploadS3(ctx context.Context, u uploadNixplayResponse, f
 }
 
 func (c *DefaultClient) DeletePhoto(ctx context.Context, photo Photo) error {
-	// xxx nixplay has a few different flavors of delete. For albums it looks
-	// like you can only delete. but for playlists it looks like you can choose
-	// to totally delete the photo, or remove it from the playlist but keep it
-	// around in the album it belongs in.
+	// xxx add "DeleteScope" nixplay has a few different flavors of delete. For
+	// albums it looks like you can only delete. but for playlists it looks like
+	// you can choose to totally delete the photo, or remove it from the
+	// playlist but keep it around in the album it belongs in.
 	//
-	// Need to decide what to do here and what I want to expose to the user.
+	// I did some playing around and there is also some weird and buggy
+	// behavior. If you choose the "permanently  delete" option in playlist it
+	// will remove ALL instances of that photo if it exists in multiple albums
+	// and not just from the one album it was added from. This happens even if
+	// you manually upload the photo multiple times to different albums instead
+	// of using Nixplay's copy to album option. This is in contrast to deleting
+	// a photo from a playlist where the only option is to remove it from that
+	// one album.
+	//
+	// The sort of exception to this is that photos are owned by a album and
+	// playlists are only associated to a photo, so if you delete a photo from
+	// an album then it will also be removed from any playlists it was a part
+	// of.
+	//
+	// Given all of this I think the easiest thing to do is to use a flavor of
+	// delete where we only remove the photo from the container you got it from
+	// instead of doing a more global delete of it. This should give relatively
+	// consistent behavior regardless of what sort of container it is coming
+	// from.
+	//
+	// The downside of the above easiest option is that it means that if I setup
+	// rclone to just sync a playlist, then when a photo is deleted from the
+	// playlist it will essentially "leak" the photo in the downloads folder and
+	// that could bloat memory usage to the point where I might start running
+	// out of storage space if stuff changes often. I think the answer to this
+	// is have a "DeleteScope" option that says at what scope the file will be
+	// deleted, either global or local to playlist. Then setup rsync where there
+	// is an option that lets you pick how delete of photos in a playlist will
+	// be handled.
+
+	// xxx doc in Nixplay playlists are allowed to contain multiple copies of
+	// the same photo, either from the same album, or from different albums.
+	// When a photo is deleted it will remove all copies of that photo. This
+	// starts getting tricky to support. I think I should just document
+	// somewhere that this tool won't support multiple copies of the same photo
+	// in an playlist and if you try to do this you may get buggy results.
 
 	panic("not implemented") // xxx: Implement
 }
