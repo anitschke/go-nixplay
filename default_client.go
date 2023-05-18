@@ -344,10 +344,17 @@ func getUploadPhotoData(name string, r io.ReadCloser, opts AddPhotoOptions) (upl
 			}
 			data.FileSize = uint64(size)
 		} else {
-			// xxx what if the expected bahvior for read closers. Is it expected
+			// xxx what if the expected behavior for read closers. Is it expected
 			// that we will always close them even if we error out? If that is
 			// the case should this defer happen right at the outer most call to
 			// add the photo?
+			//
+			// I think it is an anti-pattern to pass in a ReadCloser like this.
+			// It makes it confusing what behavior will be in cases like this
+			// where we are erroring out. It would be better to just accept a
+			// Reader. Then the user can just follow the normal pattern and do a
+			// "defer r.Close()" in their own code right before they pass the
+			// reader into the AddPhotoAPI.
 			defer r.Close()
 			buf := new(bytes.Buffer)
 			size, err := buf.ReadFrom(r)
