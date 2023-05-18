@@ -82,10 +82,11 @@ type albumPhoto struct {
 
 func (p albumPhoto) ToPhoto() Photo {
 	return Photo{
-		Name:    p.FileName,
-		ID:      p.ID,
-		MD5Hash: p.MD5,
-		URL:     p.URL,
+		Name:                p.FileName,
+		ID:                  p.ID,
+		MD5Hash:             p.MD5,
+		URL:                 p.URL,
+		parentContainerType: AlbumContainerType,
 	}
 
 	// xxx Photo also has a Size proprety to have the file size but it looks
@@ -102,17 +103,17 @@ type uploadNixplayResponseContainer struct {
 	Data uploadNixplayResponse `json:"data"`
 }
 
-//xxx remove unused stuff
+// xxx remove unused stuff
 type uploadNixplayResponse struct {
-	ACL            string   `json:"acl"`
-	Key            string   `json:"key"`
-	AWSAccessKeyID string   `json:"AWSAccessKeyId"`
-	Policy         string   `json:"Policy"`
-	Signature      string   `json:"Signature"`
+	ACL            string `json:"acl"`
+	Key            string `json:"key"`
+	AWSAccessKeyID string `json:"AWSAccessKeyId"`
+	Policy         string `json:"Policy"`
+	Signature      string `json:"Signature"`
 	// UserUploadID   string   `json:"userUploadId"`
-	BatchUploadID  string   `json:"batchUploadId"`
-	// UserUploadIds  []string `json:"userUploadIds"`
-	FileType       string   `json:"fileType"`
+	BatchUploadID string   `json:"batchUploadId"`
+	UserUploadIDs []string `json:"userUploadIds"`
+	FileType      string   `json:"fileType"`
 	// FileSize       int      `json:"fileSize"`
-	S3UploadURL    string   `json:"s3UploadUrl"`
+	S3UploadURL string `json:"s3UploadUrl"`
 }

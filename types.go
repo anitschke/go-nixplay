@@ -50,4 +50,9 @@ type Photo struct {
 	// the urls for the playlist so so we can extract it from there.
 	MD5Hash MD5Hash
 	URL     string
+
+	// xxx doc info needed for delete
+	// xxx populate this data on get and create
+	parentContainerType     ContainerType
+	internalPlaylistMediaID string
 }

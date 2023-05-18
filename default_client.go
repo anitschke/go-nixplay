@@ -19,6 +19,12 @@ import (
 	"github.com/anitschke/go-nixplay/httpx"
 )
 
+//xxx there are a few places I use strconv.itoa(int(NUMBER)) for uint64. I
+//should switch to using strconv.FormatUint instead
+
+// xxx move to top
+var errGlobalDeleteScopeNotForAlbums = errors.New("global delete scope not currently supported for albums")
+
 // xxx doc
 type DefaultClientOptions struct {
 	// xxx doc optional
@@ -294,6 +300,16 @@ func (c *DefaultClient) AddPhoto(ctx context.Context, container Container, name 
 	// same name but it does NOT allow them to have the same hash. So as we are
 	// doing the upload we will hash the file. Then we can get all the photos
 	// and detect which is the one we are looking for based on the md5Hash
+
+	//xxx we need to wait for the upload to be done though by looking at
+	if len(uploadNixplayResponse.UserUploadIDs) != 1 {
+		return Photo{}, errors.New("unable to wait for photo to be uploaded")
+	}
+	monitorId := uploadNixplayResponse.UserUploadIDs[0]
+	if err := c.monitorUpload(ctx, monitorId); err != nil {
+		return Photo{}, err
+	}
+
 	photos, err := c.Photos(ctx, container)
 	if err != nil {
 		return Photo{}, nil
@@ -374,7 +390,13 @@ func uploadTokenForm(container Container) (url.Values, error) {
 	}
 }
 
-func (c *DefaultClient) getUploadToken(ctx context.Context, container Container) (string, error) {
+func (c *DefaultClient) getUploadToken(ctx context.Context, container Container) (returnedToken string, err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("error getting upload token: %w", err)
+		}
+	}()
+
 	form, err := uploadTokenForm(container)
 	if err != nil {
 		return "", err
@@ -413,13 +435,19 @@ func uploadNixplayForm(container Container, photo uploadPhotoData, token string)
 	return form, nil
 }
 
-func (c *DefaultClient) uploadNixplay(ctx context.Context, container Container, photo uploadPhotoData, token string) (uploadNixplayResponse, error) {
+func (c *DefaultClient) uploadNixplay(ctx context.Context, container Container, photo uploadPhotoData, token string) (returnedResponse uploadNixplayResponse, err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("error uploading to nixplay: %w", err)
+		}
+	}()
+
 	form, err := uploadNixplayForm(container, photo, token)
 	if err != nil {
 		return uploadNixplayResponse{}, err
 	}
 
-	req, err := httpx.NewPostFormRequest(ctx, "https://api.nixplay.com/v3/upload/receivers/", form)
+	req, err := httpx.NewPostFormRequest(ctx, "https://api.nixplay.com/v3/photo/upload/", form)
 	if err != nil {
 		return uploadNixplayResponse{}, err
 	}
@@ -432,7 +460,12 @@ func (c *DefaultClient) uploadNixplay(ctx context.Context, container Container, 
 	return response.Data, nil
 }
 
-func (c *DefaultClient) uploadS3(ctx context.Context, u uploadNixplayResponse, filename string, r io.Reader) error {
+func (c *DefaultClient) uploadS3(ctx context.Context, u uploadNixplayResponse, filename string, r io.Reader) (err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("error uploading to s3 bucket: %w", err)
+		}
+	}()
 
 	reqBody := &bytes.Buffer{}
 	writer := multipart.NewWriter(reqBody)
@@ -474,7 +507,7 @@ func (c *DefaultClient) uploadS3(ctx context.Context, u uploadNixplayResponse, f
 	req.Header.Set("content-type", fmt.Sprintf("multipart/form-data; boundary=%s", writer.Boundary()))
 	req.Header.Set("origin", "https://app.nixplay.com")
 	req.Header.Set("referer", "https://app.nixplay.com")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req) // xxx don't use the deafult client, use the not-authourized one we were provided
 	if err != nil {
 		return err
 	}
@@ -485,48 +518,54 @@ func (c *DefaultClient) uploadS3(ctx context.Context, u uploadNixplayResponse, f
 	return nil
 }
 
-func (c *DefaultClient) DeletePhoto(ctx context.Context, photo Photo) error {
-	// xxx add "DeleteScope" nixplay has a few different flavors of delete. For
-	// albums it looks like you can only delete. but for playlists it looks like
-	// you can choose to totally delete the photo, or remove it from the
-	// playlist but keep it around in the album it belongs in.
-	//
-	// I did some playing around and there is also some weird and buggy
-	// behavior. If you choose the "permanently  delete" option in playlist it
-	// will remove ALL instances of that photo if it exists in multiple albums
-	// and not just from the one album it was added from. This happens even if
-	// you manually upload the photo multiple times to different albums instead
-	// of using Nixplay's copy to album option. This is in contrast to deleting
-	// a photo from a playlist where the only option is to remove it from that
-	// one album.
-	//
-	// The sort of exception to this is that photos are owned by a album and
-	// playlists are only associated to a photo, so if you delete a photo from
-	// an album then it will also be removed from any playlists it was a part
-	// of.
-	//
-	// Given all of this I think the easiest thing to do is to use a flavor of
-	// delete where we only remove the photo from the container you got it from
-	// instead of doing a more global delete of it. This should give relatively
-	// consistent behavior regardless of what sort of container it is coming
-	// from.
-	//
-	// The downside of the above easiest option is that it means that if I setup
-	// rclone to just sync a playlist, then when a photo is deleted from the
-	// playlist it will essentially "leak" the photo in the downloads folder and
-	// that could bloat memory usage to the point where I might start running
-	// out of storage space if stuff changes often. I think the answer to this
-	// is have a "DeleteScope" option that says at what scope the file will be
-	// deleted, either global or local to playlist. Then setup rsync where there
-	// is an option that lets you pick how delete of photos in a playlist will
-	// be handled.
+func (c *DefaultClient) monitorUpload(ctx context.Context, monitorID string) (err error) {
+	defer func() { //xxx do this sort of thing in more places
+		if err != nil {
+			err = fmt.Errorf("error monitoring upload: %w", err)
+		}
+	}()
 
-	// xxx doc in Nixplay playlists are allowed to contain multiple copies of
-	// the same photo, either from the same album, or from different albums.
-	// When a photo is deleted it will remove all copies of that photo. This
-	// starts getting tricky to support. I think I should just document
-	// somewhere that this tool won't support multiple copies of the same photo
-	// in an playlist and if you try to do this you may get buggy results.
+	url := fmt.Sprintf("https://upload-monitor.nixplay.com/status?id=%s", monitorID)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, bytes.NewReader([]byte{}))
+	if err != nil {
+		return err
+	}
+	resp, err := c.authClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return errors.New(resp.Status)
+	}
+	return nil
+}
 
-	panic("not implemented") // xxx: Implement
+func (c *DefaultClient) DeletePhoto(ctx context.Context, photo Photo, scope DeleteScope) error {
+	switch photo.parentContainerType {
+	case AlbumContainerType:
+		if scope == GlobalDeleteScope {
+			return errGlobalDeleteScopeNotForAlbums
+		}
+		return c.deleteAlbumPhoto(ctx, photo)
+	case PlaylistContainerType:
+		panic("not implemented") // xxx: Implement
+	default:
+		return ErrInvalidContainerType
+	}
+}
+
+func (c *DefaultClient) deleteAlbumPhoto(ctx context.Context, photo Photo) error {
+	url := fmt.Sprintf("https://api.nixplay.com/picture/%d/delete/json/", photo.ID)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, bytes.NewReader([]byte{}))
+	if err != nil {
+		return err
+	}
+	resp, err := c.authClient.Do(req)
+	if err != nil {
+		return err
+	}
+	//xxx check response code
+	resp.Body.Close()
+	return nil
 }

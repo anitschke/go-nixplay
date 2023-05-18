@@ -2,11 +2,21 @@ package nixplay
 
 import (
 	"context"
+	"math/rand"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/anitschke/go-nixplay/auth"
+	"github.com/anitschke/go-nixplay/test-resources/photos"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+var (
+	removeSignatureRegexp = regexp.MustCompile("Signature=[^&]*&")
+	removeExpiresRegexp   = regexp.MustCompile("Expires=[^&]*&")
 )
 
 func testClient() *DefaultClient {
@@ -19,6 +29,37 @@ func testClient() *DefaultClient {
 		panic(err)
 	}
 	return client
+}
+
+func randomName() string {
+	return strconv.FormatUint(rand.Uint64(), 36)
+}
+
+func tempContainer(t *testing.T, client Client, containerType ContainerType) Container {
+	name := randomName()
+	container, err := client.CreateContainer(context.Background(), containerType, name)
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		err := client.DeleteContainer(context.Background(), container)
+		assert.NoError(t, err)
+	})
+
+	return container
+}
+
+// sanitizePhotoURL clears out portions of the photo URL that can change over
+// time so we can directly compare photo objects to each other during testing.
+func sanitizePhotoURL(photoURL string) string {
+	photoURL = removeSignatureRegexp.ReplaceAllString(photoURL, "")
+	photoURL = removeExpiresRegexp.ReplaceAllString(photoURL, "")
+	return photoURL
+}
+
+func sanitizePhotosURL(photos []Photo) {
+	for i, _ := range photos {
+		photos[i].URL = sanitizePhotoURL(photos[i].URL)
+	}
 }
 
 func TestDefaultClient_Containers_ListGetCreateListGetDeleteListGet(t *testing.T) {
@@ -74,7 +115,7 @@ func TestDefaultClient_Containers_ListGetCreateListGetDeleteListGet(t *testing.T
 			//////////////////////////
 			// List
 			//////////////////////////
-			containers, err := client.Containers(context.Background(), tc.containerType)
+			containers, err := client.Containers(ctx, tc.containerType)
 			assert.NoError(t, err)
 
 			initialContainerNames := tc.verifyInitialContainers(containers)
@@ -131,7 +172,7 @@ func TestDefaultClient_Containers_ListGetCreateListGetDeleteListGet(t *testing.T
 			//////////////////////////
 			// List
 			//////////////////////////
-			containers, err = client.Containers(context.Background(), tc.containerType)
+			containers, err = client.Containers(ctx, tc.containerType)
 			assert.NoError(t, err)
 			assert.Len(t, containers, len(initialContainerNames))
 			names = getNamesAndCheckContainerType(containers)
@@ -145,5 +186,117 @@ func TestDefaultClient_Containers_ListGetCreateListGetDeleteListGet(t *testing.T
 			assert.Equal(t, container, Container{})
 		})
 	}
+}
 
+// xxx finish test
+func TestDefaultClient_Photo_ListAddListGetDownloadDeleteListGet(t *testing.T) {
+	type testData struct {
+		name           string
+		containerType  ContainerType
+		deleteScope    DeleteScope
+		expDeleteError error
+	}
+
+	tests := []testData{
+		{
+			name:           "AlbumContainerScope",
+			containerType:  AlbumContainerType,
+			deleteScope:    ContainerDeleteScope,
+			expDeleteError: nil,
+		},
+		{
+			name:           "AlbumGlobalScope",
+			containerType:  AlbumContainerType,
+			deleteScope:    GlobalDeleteScope,
+			expDeleteError: errGlobalDeleteScopeNotForAlbums,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			client := testClient()
+
+			// create temporary container for testing
+			container := tempContainer(t, client, tc.containerType)
+			allTestPhotos, err := photos.AllPhotos()
+			require.NoError(t, err)
+
+			//////////////////////////
+			// List
+			//////////////////////////
+			photos, err := client.Photos(ctx, container)
+			assert.NoError(t, err)
+			assert.Empty(t, photos)
+
+			//////////////////////////
+			// Add
+			//////////////////////////
+			addedPhotos := make([]Photo, 0, len(allTestPhotos))
+			for _, tp := range allTestPhotos {
+				file, err := tp.Open()
+				require.NoError(t, err)
+				defer file.Close()
+				p, err := client.AddPhoto(ctx, container, tp.Name, file, AddPhotoOptions{})
+				require.NoError(t, err)
+				//xxx test that the md5 hash is correct
+				//xxx test that the size is correct
+				assert.Equal(t, p.Name, tp.Name)
+				addedPhotos = append(addedPhotos, p)
+			}
+			sanitizePhotosURL(addedPhotos)
+
+			//////////////////////////
+			// List
+			//////////////////////////
+			photos, err = client.Photos(ctx, container)
+			sanitizePhotosURL(photos)
+			assert.NoError(t, err)
+			assert.Len(t, photos, len(addedPhotos))
+			assert.ElementsMatch(t, photos, addedPhotos)
+
+			//////////////////////////
+			// Get
+			//////////////////////////
+			// xxx TODO
+
+			//////////////////////////
+			// Download
+			//////////////////////////
+			// xxx TODO
+
+			//////////////////////////
+			// Delete
+			//////////////////////////
+			for i, p := range addedPhotos {
+				err := client.DeletePhoto(ctx, p, tc.deleteScope)
+				if tc.expDeleteError != nil {
+					assert.ErrorIs(t, err, tc.expDeleteError)
+					return
+				}
+				assert.NoError(t, err)
+
+				expPhotos := addedPhotos[i+1:]
+				photos, err := client.Photos(ctx, container)
+				sanitizePhotosURL(photos)
+				assert.NoError(t, err)
+				assert.Len(t, photos, len(expPhotos))
+				assert.ElementsMatch(t, photos, expPhotos)
+
+				//xxx also check get
+			}
+
+			//////////////////////////
+			// List
+			//////////////////////////
+			photos, err = client.Photos(ctx, container)
+			assert.NoError(t, err)
+			assert.Empty(t, photos)
+
+			//////////////////////////
+			// Get
+			//////////////////////////
+			//xxx TODO
+		})
+	}
 }
