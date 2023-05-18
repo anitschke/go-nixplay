@@ -60,3 +60,59 @@ type createPlaylistRequest struct {
 type createPlaylistResponse struct {
 	PlaylistId uint64 `json:"playlistId"`
 }
+
+type albumPhotosResponse struct {
+	Photos []albumPhoto `json:"photos"`
+}
+
+func (resp albumPhotosResponse) ToPhotos() []Photo {
+	photos := make([]Photo, 0, len(resp.Photos))
+	for _, p := range resp.Photos {
+		photos = append(photos, p.ToPhoto())
+	}
+	return photos
+}
+
+type albumPhoto struct {
+	FileName string  `json:"filename"`
+	ID       uint64  `json:"id"`
+	MD5      MD5Hash `json:"md5"`
+	URL      string  `json:"url"`
+}
+
+func (p albumPhoto) ToPhoto() Photo {
+	return Photo{
+		Name:    p.FileName,
+		ID:      p.ID,
+		MD5Hash: p.MD5,
+		URL:     p.URL,
+	}
+
+	// xxx Photo also has a Size proprety to have the file size but it looks
+	// like nixplay doesn't give that to me. Look into if there is some way to
+	// get this data since it might be require to get rclone to work.
+}
+
+type uploadTokenResponse struct {
+	Token string `json:"token"`
+}
+
+// xxx remove stuff you don't need
+type uploadNixplayResponseContainer struct {
+	Data uploadNixplayResponse `json:"data"`
+}
+
+//xxx remove unused stuff
+type uploadNixplayResponse struct {
+	ACL            string   `json:"acl"`
+	Key            string   `json:"key"`
+	AWSAccessKeyID string   `json:"AWSAccessKeyId"`
+	Policy         string   `json:"Policy"`
+	Signature      string   `json:"Signature"`
+	// UserUploadID   string   `json:"userUploadId"`
+	BatchUploadID  string   `json:"batchUploadId"`
+	// UserUploadIds  []string `json:"userUploadIds"`
+	FileType       string   `json:"fileType"`
+	// FileSize       int      `json:"fileSize"`
+	S3UploadURL    string   `json:"s3UploadUrl"`
+}

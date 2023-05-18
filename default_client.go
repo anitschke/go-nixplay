@@ -3,12 +3,17 @@ package nixplay
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"net/url"
+	"path/filepath"
+	"strconv"
 
 	"github.com/anitschke/go-nixplay/auth"
 	"github.com/anitschke/go-nixplay/httpx"
@@ -127,7 +132,7 @@ func (c *DefaultClient) createAlbum(ctx context.Context, name string) (Container
 	}
 	req, err := httpx.NewPostFormRequest(ctx, "https://api.nixplay.com/album/create/json/", formData)
 	if err != nil {
-		return Container{}, nil
+		return Container{}, err
 	}
 
 	var albums albumsResponse
@@ -214,13 +219,284 @@ func (c *DefaultClient) deletePlaylist(ctx context.Context, container Container)
 }
 
 func (c *DefaultClient) Photos(ctx context.Context, container Container) ([]Photo, error) {
-	panic("not implemented") // xxx: Implement
+	switch container.ContainerType {
+	case AlbumContainerType:
+		return c.albumPhotos(ctx, container)
+	case PlaylistContainerType:
+		panic("not implemented") // xxx: Implement
+	default:
+		return nil, ErrInvalidContainerType
+	}
+}
+
+func (c *DefaultClient) albumPhotos(ctx context.Context, container Container) ([]Photo, error) {
+	var photos []Photo
+	for page := uint64(1); ; page++ {
+		photosOnPage, err := c.albumPhotosPage(ctx, container, page)
+		if err != nil {
+			return nil, err
+		}
+		if len(photosOnPage) == 0 {
+			break
+		}
+		photos = append(photos, photosOnPage...)
+	}
+	return photos, nil
+}
+
+func (c *DefaultClient) albumPhotosPage(ctx context.Context, container Container, page uint64) ([]Photo, error) {
+	limit := 500 //same limit used by nixplay.com when getting photos
+	url := fmt.Sprintf("https://api.nixplay.com/album/%d/pictures/json/?page=%d&limit=%d", container.ID, page, limit)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, bytes.NewReader([]byte{}))
+	if err != nil {
+		return nil, err
+	}
+
+	var photos albumPhotosResponse
+	if err := httpx.DoUnmarshalJSONResponse(c.authClient, req, &photos); err != nil {
+		return nil, err
+	}
+	return photos.ToPhotos(), nil
 }
 
 func (c *DefaultClient) AddPhoto(ctx context.Context, container Container, name string, r io.ReadCloser, opts AddPhotoOptions) (Photo, error) {
-	panic("not implemented") // xxx: Implement
+	photoData, r, err := getUploadPhotoData(name, r, opts)
+	if err != nil {
+		return Photo{}, err
+	}
+
+	uploadToken, err := c.getUploadToken(ctx, container)
+	if err != nil {
+		return Photo{}, err
+	}
+
+	uploadNixplayResponse, err := c.uploadNixplay(ctx, container, photoData, uploadToken)
+	if err != nil {
+		return Photo{}, err
+	}
+
+	hasher := md5.New()
+	readAndHash := io.TeeReader(r, hasher)
+
+	if err := c.uploadS3(ctx, uploadNixplayResponse, name, readAndHash); err != nil {
+		return Photo{}, err
+	}
+
+	md5Hash := MD5Hash(hasher.Sum(nil))
+
+	// xxx unfortunately I can't find a way to get the ID of a photo when we do
+	// the upload. So we need to resort to asking for all the photos and
+	// searching through them until we find the one we uploaded. We might not
+	// always need to do this so  I should consider making this part of a
+	// different function on the client.
+	//
+	// I did some experimentation and Nixplay allows two pictures to have the
+	// same name but it does NOT allow them to have the same hash. So as we are
+	// doing the upload we will hash the file. Then we can get all the photos
+	// and detect which is the one we are looking for based on the md5Hash
+	photos, err := c.Photos(ctx, container)
+	if err != nil {
+		return Photo{}, nil
+	}
+	for _, p := range photos {
+		if p.MD5Hash == md5Hash {
+			return p, nil
+		}
+	}
+	return Photo{}, errors.New("unable to find photo after upload")
+}
+
+type uploadPhotoData struct {
+	AddPhotoOptions
+	Name string
+}
+
+func getUploadPhotoData(name string, r io.ReadCloser, opts AddPhotoOptions) (uploadPhotoData, io.ReadCloser, error) {
+	data := uploadPhotoData{
+		AddPhotoOptions: opts,
+		Name:            name,
+	}
+
+	if data.MIMEType == "" {
+		ext := filepath.Ext(name)
+		if ext == "" {
+			return uploadPhotoData{}, nil, fmt.Errorf("could not determine file extension for file %q", name)
+		}
+		data.MIMEType = mime.TypeByExtension(ext)
+		if data.MIMEType == "" {
+			return uploadPhotoData{}, nil, fmt.Errorf("could not determine mime type for file %q", name)
+		}
+	}
+
+	// If we don't know the file size we will first try to use seeker APIs to
+	// get the size since that is most efficient. If that doesn't work we will
+	// resort to reading into a buffer which requires us to buffer the entire
+	// file into memory, not ideal.
+	if data.FileSize == 0 {
+		if s, ok := r.(io.Seeker); ok {
+			size, err := s.Seek(0, io.SeekEnd)
+			if err != nil {
+				return uploadPhotoData{}, nil, err
+			}
+			// seek back to the start of file so that it can be served properly
+			if _, err := s.Seek(0, io.SeekStart); err != nil {
+				return uploadPhotoData{}, nil, err
+			}
+			data.FileSize = uint64(size)
+		} else {
+			// xxx what if the expected bahvior for read closers. Is it expected
+			// that we will always close them even if we error out? If that is
+			// the case should this defer happen right at the outer most call to
+			// add the photo?
+			defer r.Close()
+			buf := new(bytes.Buffer)
+			size, err := buf.ReadFrom(r)
+			if err != nil {
+				return uploadPhotoData{}, nil, err
+			}
+			data.FileSize = uint64(size)
+			r = io.NopCloser(buf)
+		}
+	}
+
+	return data, r, nil
+}
+
+func uploadTokenForm(container Container) (url.Values, error) {
+	switch container.ContainerType {
+	case AlbumContainerType:
+		return url.Values{
+			"albumId": {strconv.Itoa(int(container.ID))},
+			"total":   {"1"},
+		}, nil
+	case PlaylistContainerType:
+		return url.Values{
+			"playlistId": {strconv.Itoa(int(container.ID))},
+			"total":      {"1"},
+		}, nil
+	default:
+		return nil, ErrInvalidContainerType
+	}
+}
+
+func (c *DefaultClient) getUploadToken(ctx context.Context, container Container) (string, error) {
+	form, err := uploadTokenForm(container)
+	if err != nil {
+		return "", err
+	}
+
+	req, err := httpx.NewPostFormRequest(ctx, "https://api.nixplay.com/v3/upload/receivers/", form)
+	if err != nil {
+		return "", err
+	}
+
+	var response uploadTokenResponse
+	if err := httpx.DoUnmarshalJSONResponse(c.authClient, req, &response); err != nil {
+		return "", err
+	}
+
+	return response.Token, nil
+}
+
+func uploadNixplayForm(container Container, photo uploadPhotoData, token string) (url.Values, error) {
+	form := url.Values{
+		"uploadToken": {token},
+		"fileName":    {photo.Name},
+		"fileType":    {photo.MIMEType},
+		"fileSize":    {strconv.Itoa(int(photo.FileSize))},
+	}
+
+	switch container.ContainerType {
+	case AlbumContainerType:
+		form.Add("albumId", strconv.Itoa(int(container.ID)))
+	case PlaylistContainerType:
+		form.Add("playlistId", strconv.Itoa(int(container.ID)))
+	default:
+		return nil, ErrInvalidContainerType
+	}
+
+	return form, nil
+}
+
+func (c *DefaultClient) uploadNixplay(ctx context.Context, container Container, photo uploadPhotoData, token string) (uploadNixplayResponse, error) {
+	form, err := uploadNixplayForm(container, photo, token)
+	if err != nil {
+		return uploadNixplayResponse{}, err
+	}
+
+	req, err := httpx.NewPostFormRequest(ctx, "https://api.nixplay.com/v3/upload/receivers/", form)
+	if err != nil {
+		return uploadNixplayResponse{}, err
+	}
+
+	var response uploadNixplayResponseContainer
+	if err := httpx.DoUnmarshalJSONResponse(c.authClient, req, &response); err != nil {
+		return uploadNixplayResponse{}, err
+	}
+
+	return response.Data, nil
+}
+
+func (c *DefaultClient) uploadS3(ctx context.Context, u uploadNixplayResponse, filename string, r io.Reader) error {
+
+	reqBody := &bytes.Buffer{}
+	writer := multipart.NewWriter(reqBody)
+
+	formVals := map[string]string{
+		"key":                        u.Key,
+		"acl":                        u.ACL,
+		"content-type":               u.FileType,
+		"x-amz-meta-batch-upload-id": u.BatchUploadID,
+		"success_action_status":      "201",
+		"AWSAccessKeyId":             u.AWSAccessKeyID,
+		"Policy":                     u.Policy,
+		"Signature":                  u.Signature,
+	}
+	for k, v := range formVals {
+		w, err := writer.CreateFormField(k)
+		if err != nil {
+			return err
+		}
+		io.WriteString(w, v)
+	}
+
+	w, err := writer.CreateFormFile("file", filename)
+	if err != nil {
+		return err
+	}
+
+	_, err = io.Copy(w, r)
+	if err != nil {
+		return err
+	}
+	writer.Close()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.S3UploadURL, reqBody)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("accept", "application/json, text/plain, */*")
+	req.Header.Set("content-type", fmt.Sprintf("multipart/form-data; boundary=%s", writer.Boundary()))
+	req.Header.Set("origin", "https://app.nixplay.com")
+	req.Header.Set("referer", "https://app.nixplay.com")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 201 {
+		return fmt.Errorf("error uploading: %s", resp.Status)
+	}
+	return nil
 }
 
 func (c *DefaultClient) DeletePhoto(ctx context.Context, photo Photo) error {
+	// xxx nixplay has a few different flavors of delete. For albums it looks
+	// like you can only delete. but for playlists it looks like you can choose
+	// to totally delete the photo, or remove it from the playlist but keep it
+	// around in the album it belongs in.
+	//
+	// Need to decide what to do here and what I want to expose to the user.
+
 	panic("not implemented") // xxx: Implement
 }
