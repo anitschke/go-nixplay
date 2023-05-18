@@ -41,7 +41,7 @@ type Client interface {
 
 	Photos(ctx context.Context, container Container) ([]Photo, error)
 
-	AddPhoto(ctx context.Context, container Container, name string, r io.ReadCloser, opts AddPhotoOptions) (Photo, error)
+	AddPhoto(ctx context.Context, container Container, name string, r io.Reader, opts AddPhotoOptions) (Photo, error)
 
 	DeletePhoto(ctx context.Context, photo Photo) error
 }
