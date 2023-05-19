@@ -327,6 +327,9 @@ func (c *DefaultClient) getPhotoSize(ctx context.Context, photoURL string) (resp
 		return 0, err
 	}
 
+	// xxx this header can also get us the content type / mime type. It may be
+	// useful to be able to get this in the future?
+
 	contentRange := resp.Header.Get("Content-Range")
 	matches := sizeFromContentRangeRegexp.FindStringSubmatch(contentRange)
 	if len(matches) != 2 {
