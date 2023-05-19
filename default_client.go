@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"regexp"
 	"strconv"
 
 	"github.com/anitschke/go-nixplay/auth"
@@ -24,6 +25,13 @@ import (
 
 // xxx move to top
 var errGlobalDeleteScopeNotForAlbums = errors.New("global delete scope not currently supported for albums")
+
+// This regexp will parse a content range to give us the full size of the file
+// in the range request. It isn't fully compliant with parsing RFC 7233 but the
+// other cases for the content range header specified by RFC 7233 don't provide
+// the length so I think this is ok for our use case. See
+// https://datatracker.ietf.org/doc/html/rfc7233#section-4.2
+var sizeFromContentRangeRegexp = regexp.MustCompile(`^bytes \d+-\d+/(\d+)$`)
 
 // xxx doc
 type DefaultClientOptions struct {
@@ -258,11 +266,74 @@ func (c *DefaultClient) albumPhotosPage(ctx context.Context, container Container
 		return nil, err
 	}
 
-	var photos albumPhotosResponse
-	if err := httpx.DoUnmarshalJSONResponse(c.authClient, req, &photos); err != nil {
+	var albumPhotos albumPhotosResponse
+	if err := httpx.DoUnmarshalJSONResponse(c.authClient, req, &albumPhotos); err != nil {
 		return nil, err
 	}
-	return photos.ToPhotos(), nil
+
+	// xxx make photo an interface and only get size when it is requested
+	photos := albumPhotos.ToPhotos()
+	for i := range photos {
+		photos[i].Size, err = c.getPhotoSize(ctx, photos[i].URL)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return photos, nil
+}
+
+func (c *DefaultClient) getPhotoSize(ctx context.Context, photoURL string) (responseSize uint64, err error) {
+	// xxx Getting the size of the photo is a little tricky. Ideally we could
+	// use the HEAD method but the way s3 Signature works is it is for a
+	// specific method. xxx add rest of details
+	//
+	// https://stackoverflow.com/a/39663152 curl -v -r 0-0
+	//
+	// This relies on s3 honoring our request for only a single byte which at
+	// the moment it does so I think we can just assume it will continue to do
+	// so and not complicate the code more by trying to make it handle future
+	// fringe cases where s3 doesn't do what we are expecting.
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("failed to get image size: %w", err)
+		}
+	}()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, photoURL, bytes.NewReader([]byte{})) //xxx consider seeing if I can pass a nil reader in all these spots I am passing empty bytes
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Add("Range", "bytes=0-0")
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusPartialContent {
+		return 0, errors.New(resp.Status)
+	}
+
+	// I read somewhere that if we just close the body without reading it then
+	// the transport can't be reused for another connection because it will get
+	// closed. So since ssl connections are expensive to setup we will read the
+	// body and then close. Since we requested only a single byte this will be
+	// cheap
+	bodyByte := make([]byte, 1)
+	_, err = resp.Body.Read(bodyByte)
+	if err != nil && err != io.EOF {
+		return 0, err
+	}
+
+	contentRange := resp.Header.Get("Content-Range")
+	matches := sizeFromContentRangeRegexp.FindStringSubmatch(contentRange)
+	if len(matches) != 2 {
+		return 0, errors.New("could not parse Content-Range header")
+	}
+	sizeStr := matches[1]
+	return strconv.ParseUint(sizeStr, 10, 64)
 }
 
 func (c *DefaultClient) AddPhoto(ctx context.Context, container Container, name string, r io.Reader, opts AddPhotoOptions) (Photo, error) {
@@ -312,7 +383,7 @@ func (c *DefaultClient) AddPhoto(ctx context.Context, container Container, name 
 
 	photos, err := c.Photos(ctx, container)
 	if err != nil {
-		return Photo{}, nil
+		return Photo{}, err
 	}
 	for _, p := range photos {
 		if p.MD5Hash == md5Hash {

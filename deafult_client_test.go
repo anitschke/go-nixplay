@@ -2,6 +2,8 @@ package nixplay
 
 import (
 	"context"
+	"crypto/md5"
+	"io"
 	"math/rand"
 	"regexp"
 	"strconv"
@@ -188,7 +190,6 @@ func TestDefaultClient_Containers_ListGetCreateListGetDeleteListGet(t *testing.T
 	}
 }
 
-// xxx finish test
 func TestDefaultClient_Photo_ListAddListGetDownloadDeleteListGet(t *testing.T) {
 	type testData struct {
 		name           string
@@ -239,9 +240,18 @@ func TestDefaultClient_Photo_ListAddListGetDownloadDeleteListGet(t *testing.T) {
 				defer file.Close()
 				p, err := client.AddPhoto(ctx, container, tp.Name, file, AddPhotoOptions{})
 				require.NoError(t, err)
-				//xxx test that the md5 hash is correct
-				//xxx test that the size is correct
+
+				// open the file a second time and get the hash
+				fileForHash, err := tp.Open()
+				require.NoError(t, err)
+				defer fileForHash.Close()
+				hasher := md5.New()
+				io.Copy(hasher, fileForHash)
+				md5Hash := MD5Hash(hasher.Sum(nil))
+
 				assert.Equal(t, p.Name, tp.Name)
+				assert.Equal(t, p.Size, tp.Size)
+				assert.Equal(t, p.MD5Hash, md5Hash)
 				addedPhotos = append(addedPhotos, p)
 			}
 			sanitizePhotosURL(addedPhotos)

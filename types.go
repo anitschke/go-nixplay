@@ -42,6 +42,14 @@ type Container struct {
 // xxx doc
 type Photo struct {
 	Name string
+
+	// xxx it seems I have been having a lot of issues around ID. Playlist
+	// photos don't seem to have the same sort of ID that we have for albums and
+	// we don't know what the ID of a photo is once it has been uploaded. So I
+	// think I need to change this and use my own ID. Perhaps do something like
+	// do a hash combine of MD5Hash and the album ID for the id since we know
+	// both of those at upload time AND nixplay doesn't allow the same photo in
+	// an album more than once.
 	ID   uint64
 	Size uint64
 

@@ -92,6 +92,9 @@ func (p albumPhoto) ToPhoto() Photo {
 	// xxx Photo also has a Size proprety to have the file size but it looks
 	// like nixplay doesn't give that to me. Look into if there is some way to
 	// get this data since it might be require to get rclone to work.
+	//
+	// It looks like s3 has a way to get the size of an object without actually
+	// downloading. So using s3 APIs is probably the best bet.
 }
 
 type uploadTokenResponse struct {
