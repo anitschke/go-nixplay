@@ -316,11 +316,17 @@ func (c *DefaultClient) getPhotoSize(ctx context.Context, photoURL string) (resp
 		return 0, errors.New(resp.Status)
 	}
 
-	// I read somewhere that if we just close the body without reading it then
-	// the transport can't be reused for another connection because it will get
-	// closed. So since ssl connections are expensive to setup we will read the
-	// body and then close. Since we requested only a single byte this will be
-	// cheap
+	// According to the Go doc for Client we must read the body to EOF in order
+	// to be able to reuse the TCP connection for subsequent requests. It is
+	// only a single byte that we are reading so this is better than not reading
+	// and requiring a new request.
+	//
+	// https://pkg.go.dev/net/http#Client.Do
+	//
+	//     If the Body is not both read to EOF and closed, the Client's
+	//     underlying RoundTripper (typically Transport) may not be able to
+	//     re-use a persistent TCP connection to the server for a subsequent
+	//     "keep-alive" request.
 	bodyByte := make([]byte, 1)
 	_, err = resp.Body.Read(bodyByte)
 	if err != nil && err != io.EOF {
