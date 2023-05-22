@@ -2,6 +2,7 @@ package nixplay
 
 import (
 	"crypto/md5"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -18,6 +19,10 @@ var (
 	ErrInvalidContainerType = errors.New("invalid container type")
 )
 
+const IDSize = sha256.Size
+
+type ID [IDSize]byte
+
 type MD5Hash [md5.Size]byte
 
 func (hash *MD5Hash) UnmarshalText(data []byte) error {
@@ -32,7 +37,7 @@ func (hash *MD5Hash) UnmarshalText(data []byte) error {
 }
 
 // xxx doc
-type Container struct {
+type ContainerOLD struct {
 	ContainerType ContainerType
 	Name          string
 	ID            uint64
@@ -40,7 +45,7 @@ type Container struct {
 }
 
 // xxx doc
-type Photo struct {
+type PhotoOLD struct {
 	Name string
 
 	// xxx it seems I have been having a lot of issues around ID. Playlist

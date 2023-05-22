@@ -82,14 +82,30 @@ type Client interface {
 	Container(ctx context.Context, containerType ContainerType, name string) (Container, error)
 
 	CreateContainer(ctx context.Context, containerType ContainerType, name string) (Container, error)
+}
 
-	DeleteContainer(ctx context.Context, container Container) error
+// xxx doc
+type Container interface {
+	ContainerType() ContainerType
+	Name() string
+	ID() ID
 
-	Photos(ctx context.Context, container Container) ([]Photo, error)
+	PhotoCount(ctx context.Context) (int64, error)
 
-	AddPhoto(ctx context.Context, container Container, name string, r io.Reader, opts AddPhotoOptions) (Photo, error)
+	Delete(ctx context.Context) error
+	Photos(ctx context.Context) ([]Photo, error)
+	AddPhoto(ctx context.Context, name string, r io.Reader, opts AddPhotoOptions) (Photo, error)
+}
 
-	//xxx I think I need to add an API to get a photo with a specific name
+// xxx doc
+type Photo interface {
+	Name() string
+	ID() ID
 
-	DeletePhoto(ctx context.Context, photo Photo, scope DeleteScope) error
+	Size(ctx context.Context) (int64, error)
+	MD5Hash(ctx context.Context) (MD5Hash, error)
+	URL(ctx context.Context) (string, error)
+
+	Open(ctx context.Context) (io.ReadCloser, error)
+	DeletePhoto(ctx context.Context, scope DeleteScope) error
 }

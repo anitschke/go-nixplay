@@ -37,7 +37,7 @@ func randomName() string {
 	return strconv.FormatUint(rand.Uint64(), 36)
 }
 
-func tempContainer(t *testing.T, client Client, containerType ContainerType) Container {
+func tempContainer(t *testing.T, client ClientOLD, containerType ContainerType) ContainerOLD {
 	name := randomName()
 	container, err := client.CreateContainer(context.Background(), containerType, name)
 	require.NoError(t, err)
@@ -58,7 +58,7 @@ func sanitizePhotoURL(photoURL string) string {
 	return photoURL
 }
 
-func sanitizePhotosURL(photos []Photo) {
+func sanitizePhotosURL(photos []PhotoOLD) {
 	for i, _ := range photos {
 		photos[i].URL = sanitizePhotoURL(photos[i].URL)
 	}
@@ -67,13 +67,13 @@ func sanitizePhotosURL(photos []Photo) {
 func TestDefaultClient_Containers_ListGetCreateListGetDeleteListGet(t *testing.T) {
 	type testData struct {
 		containerType           ContainerType
-		verifyInitialContainers func(containers []Container) (initialContainerNames []string)
+		verifyInitialContainers func(containers []ContainerOLD) (initialContainerNames []string)
 	}
 
 	tests := []testData{
 		{
 			containerType: AlbumContainerType,
-			verifyInitialContainers: func(containers []Container) []string {
+			verifyInitialContainers: func(containers []ContainerOLD) []string {
 				// By default every nixplay account seems to have one album that can be
 				// deleted but seems to come back automatically. This album is the
 				// ${username}@mynixplay.com album. So we will check that it exists
@@ -84,7 +84,7 @@ func TestDefaultClient_Containers_ListGetCreateListGetDeleteListGet(t *testing.T
 		},
 		{
 			containerType: PlaylistContainerType,
-			verifyInitialContainers: func(containers []Container) []string {
+			verifyInitialContainers: func(containers []ContainerOLD) []string {
 				// By default every nixplay account seems to have two playlists that can not
 				// be deleted. These are a playlist for the @mynixplay.com email address and
 				// a favorites playlist.
@@ -128,7 +128,7 @@ func TestDefaultClient_Containers_ListGetCreateListGetDeleteListGet(t *testing.T
 			newName := "MyNewContainer"
 			container, err := client.Container(ctx, tc.containerType, newName)
 			assert.ErrorIs(t, err, ErrContainerNotFound)
-			assert.Equal(t, container, Container{})
+			assert.Equal(t, container, ContainerOLD{})
 
 			//////////////////////////
 			// Create
@@ -144,7 +144,7 @@ func TestDefaultClient_Containers_ListGetCreateListGetDeleteListGet(t *testing.T
 			containers, err = client.Containers(ctx, tc.containerType)
 			assert.NoError(t, err)
 
-			getNamesAndCheckContainerType := func(containers []Container) []string {
+			getNamesAndCheckContainerType := func(containers []ContainerOLD) []string {
 				names := []string{}
 				for _, c := range containers {
 					names = append(names, c.Name)
@@ -185,7 +185,7 @@ func TestDefaultClient_Containers_ListGetCreateListGetDeleteListGet(t *testing.T
 			//////////////////////////
 			container, err = client.Container(ctx, tc.containerType, newName)
 			assert.ErrorIs(t, err, ErrContainerNotFound)
-			assert.Equal(t, container, Container{})
+			assert.Equal(t, container, ContainerOLD{})
 		})
 	}
 }
@@ -233,7 +233,7 @@ func TestDefaultClient_Photo_ListAddListGetDownloadDeleteListGet(t *testing.T) {
 			//////////////////////////
 			// Add
 			//////////////////////////
-			addedPhotos := make([]Photo, 0, len(allTestPhotos))
+			addedPhotos := make([]PhotoOLD, 0, len(allTestPhotos))
 			for _, tp := range allTestPhotos {
 				file, err := tp.Open()
 				require.NoError(t, err)
