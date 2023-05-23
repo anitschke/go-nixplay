@@ -7,52 +7,42 @@ import "github.com/anitschke/go-nixplay/httpx"
 
 type albumsResponse []nixplayAlbum
 
-func (albums albumsResponse) ToContainers() []ContainerOLD {
-	containers := make([]ContainerOLD, 0, len(albums))
+func (albums albumsResponse) ToContainers(authClient httpx.Client, client httpx.Client) []Container {
+	containers := make([]Container, 0, len(albums))
 	for _, a := range albums {
-		containers = append(containers, a.ToContainer())
+		containers = append(containers, a.ToContainer(authClient, client))
 	}
 	return containers
 }
 
 type nixplayAlbum struct {
-	PhotoCount uint64 `json:"photo_count"`
+	PhotoCount int64  `json:"photo_count"`
 	Title      string `json:"title"`
 	ID         uint64 `json:"id"`
 }
 
-func (a nixplayAlbum) ToContainer() ContainerOLD {
-	return ContainerOLD{
-		ContainerType: AlbumContainerType,
-		Name:          a.Title,
-		ID:            a.ID,
-		PhotoCount:    a.PhotoCount,
-	}
+func (a nixplayAlbum) ToContainer(authClient httpx.Client, client httpx.Client) Container {
+	return newAlbum(authClient, client, a.Title, a.ID, a.PhotoCount)
 }
 
 type playlistsResponse []playlistResponse
 
-func (playlists playlistsResponse) ToContainers() []ContainerOLD {
-	containers := make([]ContainerOLD, 0, len(playlists))
+func (playlists playlistsResponse) ToContainers(authClient httpx.Client, client httpx.Client) []Container {
+	containers := make([]Container, 0, len(playlists))
 	for _, p := range playlists {
-		containers = append(containers, p.ToContainer())
+		containers = append(containers, p.ToContainer(authClient, client))
 	}
 	return containers
 }
 
 type playlistResponse struct {
-	PictureCount uint64 `json:"picture_count"`
+	PictureCount int64  `json:"picture_count"`
 	Name         string `json:"name"`
 	ID           uint64 `json:"id"`
 }
 
-func (p playlistResponse) ToContainer() ContainerOLD {
-	return ContainerOLD{
-		ContainerType: PlaylistContainerType,
-		Name:          p.Name,
-		ID:            p.ID,
-		PhotoCount:    p.PictureCount,
-	}
+func (p playlistResponse) ToContainer(authClient httpx.Client, client httpx.Client) Container {
+	return newPlaylist(authClient, client, p.Name, p.ID, p.PictureCount)
 }
 
 type createPlaylistRequest struct {

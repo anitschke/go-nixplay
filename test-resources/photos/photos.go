@@ -13,7 +13,7 @@ const expPhotoCount = 9
 type TestPhoto struct {
 	Name     string
 	FullPath string
-	Size     uint64
+	Size     int64
 }
 
 func (p TestPhoto) Open() (io.ReadCloser, error) {
@@ -48,7 +48,7 @@ func AllPhotos() ([]TestPhoto, error) {
 		p := TestPhoto{
 			Name:     e.Name(),
 			FullPath: fullPath,
-			Size:     uint64(info.Size()),
+			Size:     info.Size(),
 		}
 		photos = append(photos, p)
 	}

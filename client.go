@@ -107,5 +107,5 @@ type Photo interface {
 	URL(ctx context.Context) (string, error)
 
 	Open(ctx context.Context) (io.ReadCloser, error)
-	DeletePhoto(ctx context.Context, scope DeleteScope) error
+	Delete(ctx context.Context, scope DeleteScope) error
 }

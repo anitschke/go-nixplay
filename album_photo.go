@@ -71,6 +71,8 @@ func newAlbumPhoto(album Container, authClient httpx.Client, client httpx.Client
 	}
 }
 
+var _ = (Photo)((*albumPhoto)(nil))
+
 func (a *albumPhoto) Name() string {
 	return a.name
 }
@@ -150,7 +152,7 @@ func (a *albumPhoto) Open(ctx context.Context) (retReadCloser io.ReadCloser, err
 	return resp.Body, nil
 }
 
-func (a *albumPhoto) DeletePhoto(ctx context.Context, scope DeleteScope) (err error) {
+func (a *albumPhoto) Delete(ctx context.Context, scope DeleteScope) (err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("failed to delete photo: %w", err)

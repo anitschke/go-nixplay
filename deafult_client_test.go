@@ -37,17 +37,26 @@ func randomName() string {
 	return strconv.FormatUint(rand.Uint64(), 36)
 }
 
-func tempContainer(t *testing.T, client ClientOLD, containerType ContainerType) ContainerOLD {
+func tempContainer(t *testing.T, client Client, containerType ContainerType) Container {
 	name := randomName()
 	container, err := client.CreateContainer(context.Background(), containerType, name)
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
-		err := client.DeleteContainer(context.Background(), container)
+		err := container.Delete(context.Background())
 		assert.NoError(t, err)
 	})
 
 	return container
+}
+
+type photoData struct {
+	name string
+	id   ID
+
+	size    int64
+	md5Hash MD5Hash
+	url     string
 }
 
 // sanitizePhotoURL clears out portions of the photo URL that can change over
@@ -58,33 +67,66 @@ func sanitizePhotoURL(photoURL string) string {
 	return photoURL
 }
 
-func sanitizePhotosURL(photos []PhotoOLD) {
-	for i, _ := range photos {
-		photos[i].URL = sanitizePhotoURL(photos[i].URL)
+func newPhotoData(photo Photo) (photoData, error) {
+	ctx := context.Background()
+	data := photoData{
+		name: photo.Name(),
+		id:   photo.ID(),
 	}
+
+	var err error
+	data.size, err = photo.Size(ctx)
+	if err != nil {
+		return photoData{}, err
+	}
+
+	data.md5Hash, err = photo.MD5Hash(ctx)
+	if err != nil {
+		return photoData{}, err
+	}
+
+	data.url, err = photo.URL(ctx)
+	if err != nil {
+		return photoData{}, err
+	}
+	data.url = sanitizePhotoURL(data.url)
+
+	return data, nil
+}
+
+func photoDataSlice(photos []Photo) ([]photoData, error) {
+	data := make([]photoData, 0, len(photos))
+	for _, p := range photos {
+		d, err := newPhotoData(p)
+		if err != nil {
+			return nil, err
+		}
+		data = append(data, d)
+	}
+	return data, nil
 }
 
 func TestDefaultClient_Containers_ListGetCreateListGetDeleteListGet(t *testing.T) {
 	type testData struct {
 		containerType           ContainerType
-		verifyInitialContainers func(containers []ContainerOLD) (initialContainerNames []string)
+		verifyInitialContainers func(containers []Container) (initialContainerNames []string)
 	}
 
 	tests := []testData{
 		{
 			containerType: AlbumContainerType,
-			verifyInitialContainers: func(containers []ContainerOLD) []string {
+			verifyInitialContainers: func(containers []Container) []string {
 				// By default every nixplay account seems to have one album that can be
 				// deleted but seems to come back automatically. This album is the
 				// ${username}@mynixplay.com album. So we will check that it exists
 				assert.Len(t, containers, 1)
-				assert.Contains(t, containers[0].Name, "@mynixplay.com")
-				return []string{containers[0].Name}
+				assert.Contains(t, containers[0].Name(), "@mynixplay.com")
+				return []string{containers[0].Name()}
 			},
 		},
 		{
 			containerType: PlaylistContainerType,
-			verifyInitialContainers: func(containers []ContainerOLD) []string {
+			verifyInitialContainers: func(containers []Container) []string {
 				// By default every nixplay account seems to have two playlists that can not
 				// be deleted. These are a playlist for the @mynixplay.com email address and
 				// a favorites playlist.
@@ -93,11 +135,11 @@ func TestDefaultClient_Containers_ListGetCreateListGetDeleteListGet(t *testing.T
 				var foundEmailPlaylist bool
 				var emailPlaylistName string
 				for _, c := range containers {
-					names = append(names, c.Name)
-					assert.Equal(t, c.ContainerType, PlaylistContainerType)
-					isEmailPlaylist := strings.HasSuffix(c.Name, "@mynixplay.com")
+					names = append(names, c.Name())
+					assert.Equal(t, c.ContainerType(), PlaylistContainerType)
+					isEmailPlaylist := strings.HasSuffix(c.Name(), "@mynixplay.com")
 					if isEmailPlaylist {
-						emailPlaylistName = c.Name
+						emailPlaylistName = c.Name()
 					}
 					foundEmailPlaylist = foundEmailPlaylist || isEmailPlaylist
 				}
@@ -128,15 +170,15 @@ func TestDefaultClient_Containers_ListGetCreateListGetDeleteListGet(t *testing.T
 			newName := "MyNewContainer"
 			container, err := client.Container(ctx, tc.containerType, newName)
 			assert.ErrorIs(t, err, ErrContainerNotFound)
-			assert.Equal(t, container, ContainerOLD{})
+			assert.Equal(t, container, nil)
 
 			//////////////////////////
 			// Create
 			//////////////////////////
 			newContainer, err := client.CreateContainer(ctx, tc.containerType, newName)
 			assert.NoError(t, err)
-			assert.Equal(t, newContainer.Name, newName)
-			assert.Equal(t, newContainer.ContainerType, tc.containerType)
+			assert.Equal(t, newContainer.Name(), newName)
+			assert.Equal(t, newContainer.ContainerType(), tc.containerType)
 
 			//////////////////////////
 			// List
@@ -144,11 +186,11 @@ func TestDefaultClient_Containers_ListGetCreateListGetDeleteListGet(t *testing.T
 			containers, err = client.Containers(ctx, tc.containerType)
 			assert.NoError(t, err)
 
-			getNamesAndCheckContainerType := func(containers []ContainerOLD) []string {
+			getNamesAndCheckContainerType := func(containers []Container) []string {
 				names := []string{}
 				for _, c := range containers {
-					names = append(names, c.Name)
-					assert.Equal(t, c.ContainerType, tc.containerType)
+					names = append(names, c.Name())
+					assert.Equal(t, c.ContainerType(), tc.containerType)
 				}
 				return names
 			}
@@ -168,7 +210,7 @@ func TestDefaultClient_Containers_ListGetCreateListGetDeleteListGet(t *testing.T
 			//////////////////////////
 			// Delete
 			//////////////////////////
-			err = client.DeleteContainer(ctx, newContainer)
+			newContainer.Delete(context.Background())
 			assert.NoError(t, err)
 
 			//////////////////////////
@@ -185,7 +227,7 @@ func TestDefaultClient_Containers_ListGetCreateListGetDeleteListGet(t *testing.T
 			//////////////////////////
 			container, err = client.Container(ctx, tc.containerType, newName)
 			assert.ErrorIs(t, err, ErrContainerNotFound)
-			assert.Equal(t, container, ContainerOLD{})
+			assert.Equal(t, container, nil)
 		})
 	}
 }
@@ -226,19 +268,19 @@ func TestDefaultClient_Photo_ListAddListGetDownloadDeleteListGet(t *testing.T) {
 			//////////////////////////
 			// List
 			//////////////////////////
-			photos, err := client.Photos(ctx, container)
+			photos, err := container.Photos(ctx)
 			assert.NoError(t, err)
 			assert.Empty(t, photos)
 
 			//////////////////////////
 			// Add
 			//////////////////////////
-			addedPhotos := make([]PhotoOLD, 0, len(allTestPhotos))
+			addedPhotos := make([]Photo, 0, len(allTestPhotos))
 			for _, tp := range allTestPhotos {
 				file, err := tp.Open()
 				require.NoError(t, err)
 				defer file.Close()
-				p, err := client.AddPhoto(ctx, container, tp.Name, file, AddPhotoOptions{})
+				p, err := container.AddPhoto(ctx, tp.Name, file, AddPhotoOptions{})
 				require.NoError(t, err)
 
 				// open the file a second time and get the hash
@@ -249,21 +291,29 @@ func TestDefaultClient_Photo_ListAddListGetDownloadDeleteListGet(t *testing.T) {
 				io.Copy(hasher, fileForHash)
 				md5Hash := MD5Hash(hasher.Sum(nil))
 
-				assert.Equal(t, p.Name, tp.Name)
-				assert.Equal(t, p.Size, tp.Size)
-				assert.Equal(t, p.MD5Hash, md5Hash)
+				actSize, err := p.Size(ctx)
+				assert.NoError(t, err)
+				actMD5, err := p.MD5Hash(ctx)
+				assert.NoError(t, err)
+
+				assert.Equal(t, p.Name(), tp.Name)
+				assert.Equal(t, actSize, tp.Size)
+				assert.Equal(t, actMD5, md5Hash)
 				addedPhotos = append(addedPhotos, p)
 			}
-			sanitizePhotosURL(addedPhotos)
+			addedPhotoData, err := photoDataSlice(addedPhotos)
+			assert.NoError(t, err)
 
 			//////////////////////////
 			// List
 			//////////////////////////
-			photos, err = client.Photos(ctx, container)
-			sanitizePhotosURL(photos)
+			photos, err = container.Photos(ctx)
 			assert.NoError(t, err)
 			assert.Len(t, photos, len(addedPhotos))
-			assert.ElementsMatch(t, photos, addedPhotos)
+
+			photosData, err := photoDataSlice(photos)
+			assert.NoError(t, err)
+			assert.ElementsMatch(t, photosData, addedPhotoData)
 
 			//////////////////////////
 			// Get
@@ -279,19 +329,21 @@ func TestDefaultClient_Photo_ListAddListGetDownloadDeleteListGet(t *testing.T) {
 			// Delete
 			//////////////////////////
 			for i, p := range addedPhotos {
-				err := client.DeletePhoto(ctx, p, tc.deleteScope)
+				err := p.Delete(ctx, tc.deleteScope)
 				if tc.expDeleteError != nil {
 					assert.ErrorIs(t, err, tc.expDeleteError)
 					return
 				}
 				assert.NoError(t, err)
 
-				expPhotos := addedPhotos[i+1:]
-				photos, err := client.Photos(ctx, container)
-				sanitizePhotosURL(photos)
+				expPhotoData := addedPhotoData[i+1:]
+				photos, err := container.Photos(ctx)
 				assert.NoError(t, err)
-				assert.Len(t, photos, len(expPhotos))
-				assert.ElementsMatch(t, photos, expPhotos)
+				assert.Len(t, photos, len(addedPhotos)-i-1)
+
+				photosData, err = photoDataSlice(photos)
+				assert.NoError(t, err)
+				assert.ElementsMatch(t, photosData, expPhotoData)
 
 				//xxx also check get
 			}
@@ -299,7 +351,7 @@ func TestDefaultClient_Photo_ListAddListGetDownloadDeleteListGet(t *testing.T) {
 			//////////////////////////
 			// List
 			//////////////////////////
-			photos, err = client.Photos(ctx, container)
+			photos, err = container.Photos(ctx)
 			assert.NoError(t, err)
 			assert.Empty(t, photos)
 

@@ -38,6 +38,8 @@ func newAlbum(authClient httpx.Client, client httpx.Client, name string, nixplay
 	}
 }
 
+var _ = (Container)((*album)(nil))
+
 func (a *album) ContainerType() ContainerType {
 	return AlbumContainerType
 }
