@@ -91,10 +91,17 @@ type Container interface {
 	ID() ID
 
 	PhotoCount(ctx context.Context) (int64, error)
+	Photos(ctx context.Context) ([]Photo, error)
+	PhotoWithID(ctx context.Context, id ID) (Photo, error) //xxx doc if no photo found then return nil
 
 	Delete(ctx context.Context) error
-	Photos(ctx context.Context) ([]Photo, error)
 	AddPhoto(ctx context.Context, name string, r io.Reader, opts AddPhotoOptions) (Photo, error)
+
+	// xxx doc May be called to reset the Containers internal cache of photos
+	ResetCache()
+
+	//xxx clean this up, needed to remove the photo from the container's cache, but it shouldn't belong on this interface
+	onPhotoDelete(p Photo)
 }
 
 // xxx doc

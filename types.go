@@ -36,7 +36,7 @@ func (hash *MD5Hash) UnmarshalText(data []byte) error {
 	return nil
 }
 
-// xxx doc
+// xxx remove
 type ContainerOLD struct {
 	ContainerType ContainerType
 	Name          string
@@ -44,7 +44,7 @@ type ContainerOLD struct {
 	PhotoCount    uint64
 }
 
-// xxx doc
+// xxx remove
 type PhotoOLD struct {
 	Name string
 

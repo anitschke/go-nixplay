@@ -16,6 +16,8 @@ import (
 //xxx there are a few places I use strconv.itoa(int(NUMBER)) for uint64. I
 //should switch to using strconv.FormatUint instead
 
+//xxx move all the extra crap in the nixplay package into an internal package, things are starting to get messy
+
 // xxx doc
 type DefaultClientOptions struct {
 	// xxx doc optional

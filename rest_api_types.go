@@ -1,6 +1,10 @@
 package nixplay
 
-import "github.com/anitschke/go-nixplay/httpx"
+import (
+	"strconv"
+
+	"github.com/anitschke/go-nixplay/httpx"
+)
 
 // This file contains types to support unmarshalling all of the responses we get
 // back from Nixplay
@@ -57,25 +61,63 @@ type albumPhotosResponse struct {
 	Photos []nixplayAlbumPhoto `json:"photos"`
 }
 
-func (resp albumPhotosResponse) ToPhotos(album Container, authClient httpx.Client, client httpx.Client) []Photo {
+func (resp albumPhotosResponse) ToPhotos(album Container, authClient httpx.Client, client httpx.Client) ([]Photo, error) {
 	photos := make([]Photo, 0, len(resp.Photos))
 	for _, p := range resp.Photos {
-		photos = append(photos, p.ToPhoto(album, authClient, client))
+		asPhoto, err := p.ToPhoto(album, authClient, client)
+		if err != nil {
+			return nil, err
+		}
+		photos = append(photos, asPhoto)
 	}
-	return photos
+	return photos, nil
 }
 
 type nixplayAlbumPhoto struct {
 	FileName string  `json:"filename"`
-	ID       uint64  `json:"id"`
+	ID       int     `json:"id"`
 	MD5      MD5Hash `json:"md5"`
 	URL      string  `json:"url"`
 }
 
-func (p nixplayAlbumPhoto) ToPhoto(album Container, authClient httpx.Client, client httpx.Client) Photo {
+func (p nixplayAlbumPhoto) ToPhoto(album Container, authClient httpx.Client, client httpx.Client) (Photo, error) {
 	size := int64(-1)
-	return newAlbumPhoto(album, authClient, client, p.FileName, p.MD5, p.ID, size, p.URL)
+	return newPhoto(albumPhotoImpl, album, authClient, client, p.FileName, &p.MD5, strconv.Itoa(p.ID), size, p.URL)
 }
+
+type playlistPhotosResponse struct {
+	Photos []nixplayPlaylistPhoto `json:"slides"`
+}
+
+func (resp playlistPhotosResponse) ToPhotos(album Container, authClient httpx.Client, client httpx.Client) ([]Photo, error) {
+	photos := make([]Photo, 0, len(resp.Photos))
+	for _, p := range resp.Photos {
+		asPhoto, err := p.ToPhoto(album, authClient, client)
+		if err != nil {
+			return nil, err
+		}
+		photos = append(photos, asPhoto)
+	}
+	return photos, nil
+}
+
+type nixplayPlaylistPhoto struct {
+	FileName       string `json:"filename"`
+	PlaylistItemID string `json:"playlistItemId"`
+	URL            string `json:"originalUrl"`
+}
+
+func (p nixplayPlaylistPhoto) ToPhoto(album Container, authClient httpx.Client, client httpx.Client) (Photo, error) {
+	var md5Hash *MD5Hash
+	size := int64(-1)
+	return newPhoto(playlistPhotoImpl, album, authClient, client, p.FileName, md5Hash, p.PlaylistItemID, size, p.URL)
+}
+
+//xxx need to extract md5 hash from file URL
+//
+// ex:
+// MD5: 073089b1d67a56c63b989d4e5f660ab8
+// URL: "https://nixplay-prod-original.s3.us-west-2.amazonaws.com/3293355/3293355_073089b1d67a56c63b989d4e5f660ab8.jpg?AWSAccessKeyId=AKIATMO6HVTTPMX3NF7V&Expires=1685577599&Signature=ap5jRu1%2BNYefl4iIHA0Pj5Av91w%3D"
 
 type uploadTokenResponse struct {
 	Token string `json:"token"`

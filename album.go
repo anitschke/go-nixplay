@@ -21,6 +21,8 @@ type album struct {
 	authClient httpx.Client
 	client     httpx.Client
 	nixplayID  uint64
+
+	photoCache *photoCache
 }
 
 func newAlbum(authClient httpx.Client, client httpx.Client, name string, nixplayID uint64, photoCount int64) *album {
@@ -28,7 +30,7 @@ func newAlbum(authClient httpx.Client, client httpx.Client, name string, nixplay
 	binary.LittleEndian.PutUint64(id[:], nixplayID)
 	id = sha256.Sum256(id[:])
 
-	return &album{
+	a := &album{
 		authClient: authClient,
 		client:     client,
 		name:       name,
@@ -36,6 +38,10 @@ func newAlbum(authClient httpx.Client, client httpx.Client, name string, nixplay
 		nixplayID:  nixplayID,
 		photoCount: photoCount,
 	}
+
+	a.photoCache = newPhotoCache(a.albumPhotosPage)
+
+	return a
 }
 
 var _ = (Container)((*album)(nil))
@@ -89,21 +95,18 @@ func (a *album) Photos(ctx context.Context) (retPhotos []Photo, err error) {
 		}
 	}()
 
-	var photos []Photo
-	for page := uint64(1); ; page++ {
-		photosOnPage, err := a.albumPhotosPage(ctx, page)
-		if err != nil {
-			return nil, err
-		}
-		if len(photosOnPage) == 0 {
-			break
-		}
-		photos = append(photos, photosOnPage...)
-	}
-	return photos, nil
+	return a.photoCache.All(ctx)
 }
 
+func (a *album) PhotoWithID(ctx context.Context, id ID) (Photo, error) {
+	return a.photoCache.PhotoWithID(ctx, id)
+}
+
+// xxx doc starts with page 1
 func (a *album) albumPhotosPage(ctx context.Context, page uint64) ([]Photo, error) {
+	page++ // nixplay uses 1 based indexing for album pages but photoCache assumes 0 based.
+
+	//xxx test multiple pages somehow
 	limit := 500 //same limit used by nixplay.com when getting photos
 	url := fmt.Sprintf("https://api.nixplay.com/album/%d/pictures/json/?page=%d&limit=%d", a.nixplayID, page, limit)
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, bytes.NewReader([]byte{}))
@@ -116,7 +119,7 @@ func (a *album) albumPhotosPage(ctx context.Context, page uint64) ([]Photo, erro
 		return nil, err
 	}
 
-	return albumPhotos.ToPhotos(a, a.authClient, a.client), nil
+	return albumPhotos.ToPhotos(a, a.authClient, a.client)
 }
 
 func (a *album) AddPhoto(ctx context.Context, name string, r io.Reader, opts AddPhotoOptions) (Photo, error) {
@@ -130,7 +133,17 @@ func (a *album) AddPhoto(ctx context.Context, name string, r io.Reader, opts Add
 		return nil, err
 	}
 
-	nixplayPhotoID := uint64(0)
+	nixplayPhotoID := ""
 	photoURL := ""
-	return newAlbumPhoto(a, a.authClient, a.client, name, photoData.md5Hash, nixplayPhotoID, photoData.size, photoURL), nil
+	p, err := newPhoto(albumPhotoImpl, a, a.authClient, a.client, name, &photoData.md5Hash, nixplayPhotoID, photoData.size, photoURL)
+	a.photoCache.Add(p)
+	return p, err
+}
+
+func (a *album) ResetCache() {
+	a.photoCache.Reset()
+}
+
+func (a *album) onPhotoDelete(p Photo) {
+	a.photoCache.Remove(p)
 }

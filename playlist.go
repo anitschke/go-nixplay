@@ -13,6 +13,9 @@ import (
 	"github.com/anitschke/go-nixplay/httpx"
 )
 
+//xxx all the data getting stored is the same and almost all the methods are the
+//same, so I need to look into making common container type I can use here.
+
 type playlist struct {
 	name       string
 	id         ID
@@ -21,6 +24,8 @@ type playlist struct {
 	authClient httpx.Client
 	client     httpx.Client
 	nixplayID  uint64
+
+	photoCache *photoCache
 }
 
 func newPlaylist(authClient httpx.Client, client httpx.Client, name string, nixplayID uint64, photoCount int64) *playlist {
@@ -28,7 +33,7 @@ func newPlaylist(authClient httpx.Client, client httpx.Client, name string, nixp
 	binary.LittleEndian.PutUint64(id[:], nixplayID)
 	id = sha256.Sum256(id[:])
 
-	return &playlist{
+	p := &playlist{
 		authClient: authClient,
 		client:     client,
 		name:       name,
@@ -36,6 +41,10 @@ func newPlaylist(authClient httpx.Client, client httpx.Client, name string, nixp
 		nixplayID:  nixplayID,
 		photoCount: photoCount,
 	}
+
+	p.photoCache = newPhotoCache(p.playlistPhotosPage)
+
+	return p
 }
 
 var _ = (Container)((*playlist)(nil))
@@ -83,8 +92,39 @@ func (p *playlist) Delete(ctx context.Context) (err error) {
 }
 
 func (p *playlist) Photos(ctx context.Context) (retPhotos []Photo, err error) {
-	panic("not implemented") // xxx: Implement
+	defer func() {
+		//xxx could I wrap this into a helper so it is just one line everywhere
+		if err != nil {
+			err = fmt.Errorf("failed to get playlist photos: %w", err)
+		}
+	}()
+
+	return p.photoCache.All(ctx)
 }
+
+func (p *playlist) PhotoWithID(ctx context.Context, id ID) (Photo, error) {
+	return p.photoCache.PhotoWithID(ctx, id)
+}
+
+// xxx doc starts with page 0
+func (p *playlist) playlistPhotosPage(ctx context.Context, page uint64) ([]Photo, error) {
+	limit := uint64(100) //same limit used by nixplay.com when getting photos
+	offset := page * limit
+	url := fmt.Sprintf("https://api.nixplay.com/v3/playlists/%d/slides?size=%d&offset=%d", p.nixplayID, limit, offset)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, bytes.NewReader([]byte{}))
+	if err != nil {
+		return nil, err
+	}
+
+	var playlistPhotos playlistPhotosResponse
+	if err := httpx.DoUnmarshalJSONResponse(p.authClient, req, &playlistPhotos); err != nil {
+		return nil, err
+	}
+
+	return playlistPhotos.ToPhotos(p, p.authClient, p.client)
+}
+
+//xxx https://api.nixplay.com/v3/playlists/10398920/slides?size=100&offset=0
 
 func (p *playlist) AddPhoto(ctx context.Context, name string, r io.Reader, opts AddPhotoOptions) (Photo, error) {
 	albumID := uploadContainerID{
@@ -97,9 +137,18 @@ func (p *playlist) AddPhoto(ctx context.Context, name string, r io.Reader, opts 
 		return nil, err
 	}
 
-	nixplayPhotoID := uint64(0)
+	nixplayPhotoID := ""
 	photoURL := ""
 
-	panic("not implemented") // xxx: Implement playlistPhoto
-	return newAlbumPhoto(p, p.authClient, p.client, name, photoData.md5Hash, nixplayPhotoID, photoData.size, photoURL), nil
+	photo, err := newPhoto(playlistPhotoImpl, p, p.authClient, p.client, name, &photoData.md5Hash, nixplayPhotoID, photoData.size, photoURL)
+	p.photoCache.Add(photo)
+	return photo, err
+}
+
+func (p *playlist) ResetCache() {
+	p.photoCache.Reset()
+}
+
+func (p *playlist) onPhotoDelete(photo Photo) {
+	p.photoCache.Remove(photo)
 }
