@@ -8,7 +8,7 @@ import (
 	"runtime"
 )
 
-const expPhotoCount = 9
+const expPhotoCount = 9 //xxx cut down on number of photos to speed up testing
 
 type TestPhoto struct {
 	Name     string

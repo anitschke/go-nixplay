@@ -25,6 +25,8 @@ type album struct {
 	photoCache *photoCache
 }
 
+//xxx add test setup code that deletes existing albums and playlists
+
 func newAlbum(authClient httpx.Client, client httpx.Client, name string, nixplayID uint64, photoCount int64) *album {
 	var id ID
 	binary.LittleEndian.PutUint64(id[:], nixplayID)
@@ -79,7 +81,11 @@ func (a *album) Delete(ctx context.Context) (err error) {
 		return err
 	}
 	defer resp.Body.Close()
-	if _, err = io.ReadAll(resp.Body); err != nil {
+
+	// xxx change all places where I am doing this io.ReadAll to
+	//
+	// defer io.Copy(ioutil.Discard, res.Body)
+	if _, err = io.ReadAll(resp.Body); err != nil { //xxx change all places where I am doing this to
 		return err
 	}
 	if err = httpx.StatusError(resp); err != nil {

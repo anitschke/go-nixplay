@@ -101,6 +101,17 @@ func (resp playlistPhotosResponse) ToPhotos(album Container, authClient httpx.Cl
 	return photos, nil
 }
 
+// xxx xxxxxx LEFT OFF HERE xxxxxx xxx
+//
+// Major problem right now is the playlist photo response doesn't tell me the
+// file name and I don't see an obvious way to get access to it. It might not
+// even be possible to get access to it...
+//
+// actually did some more digging and it looks like we can get access to the
+// data by using the ID filed of the nixplayPlaylistPhoto (not listed in the
+// struct below but it is in the response) and then doing a GET request to
+// https://api.nixplay.com/picture/783727100/ (where 783727100 is the photo id)
+
 type nixplayPlaylistPhoto struct {
 	FileName       string `json:"filename"`
 	PlaylistItemID string `json:"playlistItemId"`
@@ -112,12 +123,6 @@ func (p nixplayPlaylistPhoto) ToPhoto(album Container, authClient httpx.Client, 
 	size := int64(-1)
 	return newPhoto(playlistPhotoImpl, album, authClient, client, p.FileName, md5Hash, p.PlaylistItemID, size, p.URL)
 }
-
-//xxx need to extract md5 hash from file URL
-//
-// ex:
-// MD5: 073089b1d67a56c63b989d4e5f660ab8
-// URL: "https://nixplay-prod-original.s3.us-west-2.amazonaws.com/3293355/3293355_073089b1d67a56c63b989d4e5f660ab8.jpg?AWSAccessKeyId=AKIATMO6HVTTPMX3NF7V&Expires=1685577599&Signature=ap5jRu1%2BNYefl4iIHA0Pj5Av91w%3D"
 
 type uploadTokenResponse struct {
 	Token string `json:"token"`

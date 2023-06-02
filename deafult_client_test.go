@@ -253,6 +253,18 @@ func TestDefaultClient_Photo_ListAddListGetDownloadDeleteListGet(t *testing.T) {
 			deleteScope:    GlobalDeleteScope,
 			expDeleteError: errGlobalDeleteScopeNotForAlbums,
 		},
+		{
+			name:           "PlaylistContainerScope",
+			containerType:  PlaylistContainerType,
+			deleteScope:    ContainerDeleteScope,
+			expDeleteError: nil,
+		},
+		{
+			name:           "PlaylistGlobalScope",
+			containerType:  PlaylistContainerType,
+			deleteScope:    GlobalDeleteScope,
+			expDeleteError: nil,
+		},
 	}
 
 	for _, tc := range tests {

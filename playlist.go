@@ -106,7 +106,6 @@ func (p *playlist) PhotoWithID(ctx context.Context, id ID) (Photo, error) {
 	return p.photoCache.PhotoWithID(ctx, id)
 }
 
-// xxx doc starts with page 0
 func (p *playlist) playlistPhotosPage(ctx context.Context, page uint64) ([]Photo, error) {
 	limit := uint64(100) //same limit used by nixplay.com when getting photos
 	offset := page * limit
@@ -123,8 +122,6 @@ func (p *playlist) playlistPhotosPage(ctx context.Context, page uint64) ([]Photo
 
 	return playlistPhotos.ToPhotos(p, p.authClient, p.client)
 }
-
-//xxx https://api.nixplay.com/v3/playlists/10398920/slides?size=100&offset=0
 
 func (p *playlist) AddPhoto(ctx context.Context, name string, r io.Reader, opts AddPhotoOptions) (Photo, error) {
 	albumID := uploadContainerID{

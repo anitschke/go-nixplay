@@ -90,6 +90,9 @@ func newPhoto(impl photoImplementation, container Container, authClient httpx.Cl
 	if impl == nil {
 		panic("nil photo impl")
 	}
+	if name == "" {
+		panic("empty name provided")
+	}
 
 	// Unfortunately when we upload a photo there isn't any way to get the
 	// nixplay ID of the photo without getting ALL the photos in that

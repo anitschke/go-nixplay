@@ -151,8 +151,9 @@ func (pc *photoCache) Remove(p Photo) {
 	defer pc.mu.Unlock()
 
 	// Delete photo from the pc.photos slice
+	id := p.ID()
 	for i, possible := range pc.photos {
-		if p == possible {
+		if id == possible.ID() {
 			pc.photos[i] = pc.photos[len(pc.photos)-1]
 			pc.photos = pc.photos[:len(pc.photos)-1]
 			break

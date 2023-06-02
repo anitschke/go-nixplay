@@ -3,6 +3,7 @@ package httpx
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 )
@@ -22,6 +23,9 @@ func DoUnmarshalJSONResponse(client Client, request *http.Request, response any)
 	if err != nil {
 		return err
 	}
+
+	//xxx
+	fmt.Println(string(body))
 
 	return json.Unmarshal(body, response)
 }
