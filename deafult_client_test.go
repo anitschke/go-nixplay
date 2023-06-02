@@ -234,41 +234,20 @@ func TestDefaultClient_Containers_ListGetCreateListGetDeleteListGet(t *testing.T
 
 func TestDefaultClient_Photo_ListAddListGetDownloadDeleteListGet(t *testing.T) {
 	type testData struct {
-		name           string
-		containerType  ContainerType
-		deleteScope    DeleteScope
-		expDeleteError error
+		containerType ContainerType
 	}
 
 	tests := []testData{
 		{
-			name:           "AlbumContainerScope",
-			containerType:  AlbumContainerType,
-			deleteScope:    ContainerDeleteScope,
-			expDeleteError: nil,
+			containerType: AlbumContainerType,
 		},
 		{
-			name:           "AlbumGlobalScope",
-			containerType:  AlbumContainerType,
-			deleteScope:    GlobalDeleteScope,
-			expDeleteError: errGlobalDeleteScopeNotForAlbums,
-		},
-		{
-			name:           "PlaylistContainerScope",
-			containerType:  PlaylistContainerType,
-			deleteScope:    ContainerDeleteScope,
-			expDeleteError: nil,
-		},
-		{
-			name:           "PlaylistGlobalScope",
-			containerType:  PlaylistContainerType,
-			deleteScope:    GlobalDeleteScope,
-			expDeleteError: nil,
+			containerType: PlaylistContainerType,
 		},
 	}
 
 	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(string(tc.containerType), func(t *testing.T) {
 			ctx := context.Background()
 			client := testClient()
 
@@ -341,11 +320,7 @@ func TestDefaultClient_Photo_ListAddListGetDownloadDeleteListGet(t *testing.T) {
 			// Delete
 			//////////////////////////
 			for i, p := range addedPhotos {
-				err := p.Delete(ctx, tc.deleteScope)
-				if tc.expDeleteError != nil {
-					assert.ErrorIs(t, err, tc.expDeleteError)
-					return
-				}
+				err := p.Delete(ctx)
 				assert.NoError(t, err)
 
 				expPhotoData := addedPhotoData[i+1:]

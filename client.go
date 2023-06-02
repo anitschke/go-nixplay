@@ -25,6 +25,11 @@ type AddPhotoOptions struct {
 	FileSize uint64
 }
 
+// xxx Add comment in limitations section of doc that it is possible to remove a
+// photo from an playlist without removing it from the album it lives in but for
+// the purpose of keeping things simple right now we don't support that. We just
+// always delete the photo from everywhere.
+//
 // xxx doc nixplay has a few different flavors of delete. For albums it looks
 // like you can only delete. but for playlists it looks like you can choose to
 // totally delete the photo, or remove it from the playlist but keep it around
@@ -62,12 +67,6 @@ type AddPhotoOptions struct {
 // and deleting any that have the same hash. But this would be expensive... so
 // lets just error out for now if someone tries to use global for deleting a
 // photo from an album.
-type DeleteScope string
-
-const (
-	GlobalDeleteScope    = DeleteScope("global")
-	ContainerDeleteScope = DeleteScope("container")
-)
 
 //xxx I think it would be better to redesign all of this in a more OO way where we have methods on the container / photos
 
@@ -114,5 +113,5 @@ type Photo interface {
 	URL(ctx context.Context) (string, error)
 
 	Open(ctx context.Context) (io.ReadCloser, error)
-	Delete(ctx context.Context, scope DeleteScope) error
+	Delete(ctx context.Context) error
 }

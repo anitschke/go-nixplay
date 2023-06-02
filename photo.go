@@ -36,12 +36,6 @@ var sizeFromContentRangeRegexp = regexp.MustCompile(`^bytes \d+-\d+/(\d+)$`)
 // the url. ie "/3293355/3293355_073089b1d67a56c63b989d4e5f660ab8.jpg"
 var md5HashFromPhotoURLPath = regexp.MustCompile(`^/\d+/\d+_([A-Fa-f0-9]{32}).jpg$`)
 
-// photoImplementation is used by photo to provide implementation specific
-// details that are different for album photos vs playlist photos.
-type photoImplementation interface {
-	DeleteRequest(ctx context.Context, scope DeleteScope, container Container, nixplayID string) (*http.Request, error)
-}
-
 // photo is the type that implements the Photo interface.
 //
 // The object hierarchy here gets a little strange because there are some
@@ -57,16 +51,15 @@ type photo struct {
 	container  Container
 	authClient httpx.Client
 	client     httpx.Client
-	impl       photoImplementation
 
 	//xxx needs mutex for things that can be updated
 
-	nixplayID string
+	nixplayID string //xxx change to uint64
 	size      int64
 	url       string
 }
 
-func newPhoto(impl photoImplementation, container Container, authClient httpx.Client, client httpx.Client, name string, md5Hash *MD5Hash, nixplayID string, size int64, url string) (*photo, error) {
+func newPhoto(container Container, authClient httpx.Client, client httpx.Client, name string, md5Hash *MD5Hash, nixplayID string, size int64, url string) (*photo, error) {
 	// Based on current usage of newPhoto the MD5 hash should always be able to
 	// be provided, either because we are uploading a photo so we can do the
 	// hash ourselves, or because we are getting a list of photos and can
@@ -84,14 +77,6 @@ func newPhoto(impl photoImplementation, container Container, authClient httpx.Cl
 			return nil, err
 		}
 		md5Hash = &md5HashValue
-	}
-
-	//xxx remove
-	if impl == nil {
-		panic("nil photo impl")
-	}
-	if name == "" {
-		panic("empty name provided")
 	}
 
 	// Unfortunately when we upload a photo there isn't any way to get the
@@ -118,18 +103,15 @@ func newPhoto(impl photoImplementation, container Container, authClient httpx.Cl
 	// same playlist, or at least doesn't guarantee that these photos will have
 	// a unique ID.
 	//
-	// So with all that being said we will hash the playlist id together with
-	// the name and MD5 hash of the photo and that should give us a unique
-	// enough ID with the exception of the above mentioned issue. (we do name
-	// here to since it maybe helps prevent the above issue if the photos happen
-	// to be the same but have different names)
+	// So with all that being said we will hash the container id together with
+	// the MD5 hash of the photo and that should give us a unique
+	// enough ID with the exception of the above mentioned issue.
 
 	//xxx document the above incompatibility somewhere in reademe
 
 	containerID := container.ID()
 	hasher := sha256.New()
 	hasher.Write(containerID[:]) // shouldn't ever error so we don't need to check for one
-	hasher.Write([]byte(name))
 	hasher.Write(md5Hash[:])
 	id := ID(hasher.Sum([]byte{}))
 
@@ -141,7 +123,6 @@ func newPhoto(impl photoImplementation, container Container, authClient httpx.Cl
 		container:  container,
 		authClient: authClient,
 		client:     client,
-		impl:       impl,
 
 		nixplayID: nixplayID,
 		size:      size,
@@ -177,6 +158,17 @@ func md5HashFromPhotoURL(photoURL string) (returnHash MD5Hash, err error) {
 }
 
 func (p *photo) Name() string {
+	if p.name == "" {
+		if err := p.populatePhotoDataFromPictureEndpoint(context.TODO()); err != nil { //xxx make sure I pass a context into every getter except for ID
+			//xxx return as error instead
+			panic(err.Error())
+		}
+	}
+	if p.name == "" {
+		//xxx return as error instead
+		panic("failed to determine photo name")
+	}
+
 	return p.name
 }
 
@@ -255,7 +247,7 @@ func (p *photo) Open(ctx context.Context) (retReadCloser io.ReadCloser, err erro
 	return resp.Body, nil
 }
 
-func (p *photo) Delete(ctx context.Context, scope DeleteScope) (err error) {
+func (p *photo) Delete(ctx context.Context) (err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("failed to delete photo: %w", err)
@@ -267,7 +259,8 @@ func (p *photo) Delete(ctx context.Context, scope DeleteScope) (err error) {
 		return err
 	}
 
-	req, err := p.impl.DeleteRequest(ctx, scope, p.container, nixplayID)
+	url := fmt.Sprintf("https://api.nixplay.com/picture/%s/delete/json/", nixplayID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader([]byte{}))
 	if err != nil {
 		return err
 	}
@@ -371,6 +364,36 @@ func (p *photo) attemptPopulatePhotoDataFromListSearch(ctx context.Context) (boo
 	return false, nil
 }
 
+func (p *photo) populatePhotoDataFromPictureEndpoint(ctx context.Context) error {
+	id, err := p.getNixplayID(ctx)
+	if err != nil {
+		return err
+	}
+
+	idAsInt, err := strconv.Atoi(id)
+	if err != nil {
+		return err
+	}
+	url := fmt.Sprintf("https://api.nixplay.com/picture/%d/", idAsInt)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, bytes.NewReader(nil)) //xxx consider seeing if I can pass a nil reader in all these spots I am passing empty bytes
+	if err != nil {
+		return err
+	}
+
+	var nixplayPhoto nixplayAlbumPhoto
+	if err := httpx.DoUnmarshalJSONResponse(p.authClient, req, &nixplayPhoto); err != nil {
+		return err
+	}
+
+	photoFromPicEndpoint, err := nixplayPhoto.ToPhoto(p.container, p.authClient, p.client)
+	if err != nil {
+		return err
+	}
+
+	p.name = photoFromPicEndpoint.Name()
+	return nil
+}
+
 func (p *photo) populatePhotoDataFromHead(ctx context.Context) error {
 	// xxx doc Getting the size of the photo is a little tricky. Ideally we could
 	// use the HEAD method but the way s3 Signature works is it is for a
@@ -387,7 +410,7 @@ func (p *photo) populatePhotoDataFromHead(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, photoURL, bytes.NewReader([]byte{})) //xxx consider seeing if I can pass a nil reader in all these spots I am passing empty bytes
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, photoURL, bytes.NewReader(nil)) //xxx consider seeing if I can pass a nil reader in all these spots I am passing empty bytes
 	if err != nil {
 		return err
 	}

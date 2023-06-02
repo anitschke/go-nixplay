@@ -3,7 +3,6 @@ package httpx
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 )
@@ -19,13 +18,12 @@ func DoUnmarshalJSONResponse(client Client, request *http.Request, response any)
 		return errors.New(resp.Status)
 	}
 
+	//xxx still read all even if there was an error so we can reuse
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
-
-	//xxx
-	fmt.Println(string(body))
 
 	return json.Unmarshal(body, response)
 }

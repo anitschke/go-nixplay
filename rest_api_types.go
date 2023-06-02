@@ -82,7 +82,7 @@ type nixplayAlbumPhoto struct {
 
 func (p nixplayAlbumPhoto) ToPhoto(album Container, authClient httpx.Client, client httpx.Client) (Photo, error) {
 	size := int64(-1)
-	return newPhoto(albumPhotoImpl, album, authClient, client, p.FileName, &p.MD5, strconv.Itoa(p.ID), size, p.URL)
+	return newPhoto(album, authClient, client, p.FileName, &p.MD5, strconv.Itoa(p.ID), size, p.URL)
 }
 
 type playlistPhotosResponse struct {
@@ -113,15 +113,15 @@ func (resp playlistPhotosResponse) ToPhotos(album Container, authClient httpx.Cl
 // https://api.nixplay.com/picture/783727100/ (where 783727100 is the photo id)
 
 type nixplayPlaylistPhoto struct {
-	FileName       string `json:"filename"`
-	PlaylistItemID string `json:"playlistItemId"`
-	URL            string `json:"originalUrl"`
+	ID  uint64 `json:"dbId"`
+	URL string `json:"originalUrl"`
 }
 
 func (p nixplayPlaylistPhoto) ToPhoto(album Container, authClient httpx.Client, client httpx.Client) (Photo, error) {
+	name := ""
 	var md5Hash *MD5Hash
 	size := int64(-1)
-	return newPhoto(playlistPhotoImpl, album, authClient, client, p.FileName, md5Hash, p.PlaylistItemID, size, p.URL)
+	return newPhoto(album, authClient, client, name, md5Hash, strconv.Itoa(int(p.ID)), size, p.URL)
 }
 
 type uploadTokenResponse struct {

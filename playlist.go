@@ -106,6 +106,10 @@ func (p *playlist) PhotoWithID(ctx context.Context, id ID) (Photo, error) {
 	return p.photoCache.PhotoWithID(ctx, id)
 }
 
+// xxx I think we can leave the size an offset off to just get all the photos in
+// one page. This simplifies things a lot. before you make this change confirm
+// it will work by adding a test that adds 1000 photos (this is more than
+// default size for either album or playlist)
 func (p *playlist) playlistPhotosPage(ctx context.Context, page uint64) ([]Photo, error) {
 	limit := uint64(100) //same limit used by nixplay.com when getting photos
 	offset := page * limit
@@ -137,7 +141,7 @@ func (p *playlist) AddPhoto(ctx context.Context, name string, r io.Reader, opts 
 	nixplayPhotoID := ""
 	photoURL := ""
 
-	photo, err := newPhoto(playlistPhotoImpl, p, p.authClient, p.client, name, &photoData.md5Hash, nixplayPhotoID, photoData.size, photoURL)
+	photo, err := newPhoto(p, p.authClient, p.client, name, &photoData.md5Hash, nixplayPhotoID, photoData.size, photoURL)
 	p.photoCache.Add(photo)
 	return photo, err
 }

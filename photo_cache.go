@@ -109,6 +109,11 @@ func (pc *photoCache) loadAllUnsafe(ctx context.Context) (err error) {
 // is already locked. Any new photos loaded as part of the next page will be
 // returned
 func (pc *photoCache) loadNextPageUnsafe(ctx context.Context) ([]Photo, error) {
+	// xxx I think we can leave the size an offset off to just get all the photos in
+	// one page. This simplifies things a lot. before you make this change confirm
+	// it will work by adding a test that adds 1000 photos (this is more than
+	// default size for either album or playlist)
+
 	photos, err := pc.photoPageFunc(ctx, pc.nextPage)
 	if err != nil {
 		return nil, err

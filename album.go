@@ -108,7 +108,10 @@ func (a *album) PhotoWithID(ctx context.Context, id ID) (Photo, error) {
 	return a.photoCache.PhotoWithID(ctx, id)
 }
 
-// xxx doc starts with page 1
+// xxx I think we can leave the size an offset off to just get all the photos in
+// one page. This simplifies things a lot. before you make this change confirm
+// it will work by adding a test that adds 1000 photos (this is more than
+// default size for either album or playlist)
 func (a *album) albumPhotosPage(ctx context.Context, page uint64) ([]Photo, error) {
 	page++ // nixplay uses 1 based indexing for album pages but photoCache assumes 0 based.
 
@@ -141,7 +144,7 @@ func (a *album) AddPhoto(ctx context.Context, name string, r io.Reader, opts Add
 
 	nixplayPhotoID := ""
 	photoURL := ""
-	p, err := newPhoto(albumPhotoImpl, a, a.authClient, a.client, name, &photoData.md5Hash, nixplayPhotoID, photoData.size, photoURL)
+	p, err := newPhoto(a, a.authClient, a.client, name, &photoData.md5Hash, nixplayPhotoID, photoData.size, photoURL)
 	a.photoCache.Add(p)
 	return p, err
 }
