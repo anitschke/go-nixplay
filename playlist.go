@@ -11,6 +11,7 @@ import (
 	"strconv"
 
 	"github.com/anitschke/go-nixplay/httpx"
+	"github.com/anitschke/go-nixplay/internal/cache"
 	"github.com/anitschke/go-nixplay/types"
 )
 
@@ -25,7 +26,7 @@ type playlist struct {
 	client    httpx.Client
 	nixplayID uint64
 
-	photoCache *photoCache
+	photoCache *cache.Cache[Photo]
 }
 
 func newPlaylist(client httpx.Client, name string, nixplayID uint64, photoCount int64) *playlist {
@@ -41,7 +42,7 @@ func newPlaylist(client httpx.Client, name string, nixplayID uint64, photoCount 
 		photoCount: photoCount,
 	}
 
-	p.photoCache = newPhotoCache(p.playlistPhotosPage)
+	p.photoCache = cache.NewCache(p.playlistPhotosPage)
 
 	return p
 }

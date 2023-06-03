@@ -11,6 +11,7 @@ import (
 	"strconv"
 
 	"github.com/anitschke/go-nixplay/httpx"
+	"github.com/anitschke/go-nixplay/internal/cache"
 	"github.com/anitschke/go-nixplay/types"
 )
 
@@ -22,7 +23,7 @@ type album struct {
 	client    httpx.Client
 	nixplayID uint64
 
-	photoCache *photoCache
+	photoCache *cache.Cache[Photo]
 }
 
 func newAlbum(client httpx.Client, name string, nixplayID uint64, photoCount int64) *album {
@@ -38,7 +39,7 @@ func newAlbum(client httpx.Client, name string, nixplayID uint64, photoCount int
 		photoCount: photoCount,
 	}
 
-	a.photoCache = newPhotoCache(a.albumPhotosPage)
+	a.photoCache = cache.NewCache(a.albumPhotosPage)
 
 	return a
 }
