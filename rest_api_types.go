@@ -2,6 +2,7 @@ package nixplay
 
 import (
 	"github.com/anitschke/go-nixplay/httpx"
+	"github.com/anitschke/go-nixplay/types"
 )
 
 // This file contains types to support unmarshalling all of the responses we get
@@ -72,10 +73,10 @@ func (resp albumPhotosResponse) ToPhotos(album Container, client httpx.Client) (
 }
 
 type nixplayAlbumPhoto struct {
-	FileName string  `json:"filename"`
-	ID       uint64  `json:"id"`
-	MD5      MD5Hash `json:"md5"`
-	URL      string  `json:"url"`
+	FileName string        `json:"filename"`
+	ID       uint64        `json:"id"`
+	MD5      types.MD5Hash `json:"md5"`
+	URL      string        `json:"url"`
 }
 
 func (p nixplayAlbumPhoto) ToPhoto(album Container, client httpx.Client) (Photo, error) {
@@ -99,7 +100,6 @@ func (resp playlistPhotosResponse) ToPhotos(album Container, client httpx.Client
 	return photos, nil
 }
 
-
 type nixplayPlaylistPhoto struct {
 	ID  uint64 `json:"dbId"`
 	URL string `json:"originalUrl"`
@@ -107,7 +107,7 @@ type nixplayPlaylistPhoto struct {
 
 func (p nixplayPlaylistPhoto) ToPhoto(album Container, client httpx.Client) (Photo, error) {
 	name := ""
-	var md5Hash *MD5Hash
+	var md5Hash *types.MD5Hash
 	size := int64(-1)
 	return newPhoto(album, client, name, md5Hash, p.ID, size, p.URL)
 }

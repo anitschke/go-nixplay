@@ -1,4 +1,4 @@
-package nixplay
+package types
 
 import (
 	"crypto/md5"
@@ -8,6 +8,7 @@ import (
 	"fmt"
 )
 
+//xxx doc 
 type ContainerType string
 
 const (
@@ -19,9 +20,10 @@ var (
 	ErrInvalidContainerType = errors.New("invalid container type")
 )
 
+//xxx doc
+type ID [IDSize]byte
 const IDSize = sha256.Size
 
-type ID [IDSize]byte
 
 type MD5Hash [md5.Size]byte
 

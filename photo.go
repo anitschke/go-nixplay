@@ -13,6 +13,7 @@ import (
 	"strconv"
 
 	"github.com/anitschke/go-nixplay/httpx"
+	"github.com/anitschke/go-nixplay/types"
 )
 
 // This regexp will parse a content range to give us the full size of the file
@@ -45,11 +46,11 @@ var md5HashFromPhotoURLPath = regexp.MustCompile(`^/\d+/\d+_([A-Fa-f0-9]{32}).jp
 // album/playlist photos.
 type photo struct {
 	name    string
-	id      ID
-	md5Hash MD5Hash
+	id      types.ID
+	md5Hash types.MD5Hash
 
-	container  Container
-	client     httpx.Client
+	container Container
+	client    httpx.Client
 
 	//xxx needs mutex for things that can be updated
 
@@ -58,7 +59,7 @@ type photo struct {
 	url       string
 }
 
-func newPhoto(container Container, client httpx.Client, name string, md5Hash *MD5Hash, nixplayID uint64, size int64, url string) (*photo, error) {
+func newPhoto(container Container, client httpx.Client, name string, md5Hash *types.MD5Hash, nixplayID uint64, size int64, url string) (*photo, error) {
 	// Based on current usage of newPhoto the MD5 hash should always be able to
 	// be provided, either because we are uploading a photo so we can do the
 	// hash ourselves, or because we are getting a list of photos and can
@@ -112,15 +113,15 @@ func newPhoto(container Container, client httpx.Client, name string, md5Hash *MD
 	hasher := sha256.New()
 	hasher.Write(containerID[:]) // shouldn't ever error so we don't need to check for one
 	hasher.Write(md5Hash[:])
-	id := ID(hasher.Sum([]byte{}))
+	id := types.ID(hasher.Sum([]byte{}))
 
 	return &photo{
 		name:    name,
 		id:      id,
 		md5Hash: *md5Hash,
 
-		container:  container,
-		client:     client,
+		container: container,
+		client:    client,
 
 		nixplayID: nixplayID,
 		size:      size,
@@ -130,7 +131,7 @@ func newPhoto(container Container, client httpx.Client, name string, md5Hash *MD
 
 var _ = (Photo)((*photo)(nil))
 
-func md5HashFromPhotoURL(photoURL string) (returnHash MD5Hash, err error) {
+func md5HashFromPhotoURL(photoURL string) (returnHash types.MD5Hash, err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("failed to parse playlist photo URL for MD5 hash %q: %w", photoURL, err)
@@ -139,18 +140,18 @@ func md5HashFromPhotoURL(photoURL string) (returnHash MD5Hash, err error) {
 
 	urlObj, err := url.Parse(photoURL)
 	if err != nil {
-		return MD5Hash{}, err
+		return types.MD5Hash{}, err
 	}
 
 	matches := md5HashFromPhotoURLPath.FindStringSubmatch(urlObj.Path)
 	if len(matches) != 2 {
-		return MD5Hash{}, errors.New("regexp failed to find MD5 hash in URL")
+		return types.MD5Hash{}, errors.New("regexp failed to find MD5 hash in URL")
 	}
 	hashStr := matches[1]
-	var hash MD5Hash
+	var hash types.MD5Hash
 	err = hash.UnmarshalText([]byte(hashStr))
 	if err != nil {
-		return MD5Hash{}, err
+		return types.MD5Hash{}, err
 	}
 	return hash, nil
 }
@@ -168,7 +169,7 @@ func (p *photo) Name(ctx context.Context) (string, error) {
 	return p.name, nil
 }
 
-func (p *photo) ID() ID {
+func (p *photo) ID() types.ID {
 	return p.id
 }
 
@@ -186,7 +187,7 @@ func (p *photo) Size(ctx context.Context) (int64, error) {
 	return p.size, nil
 }
 
-func (p *photo) MD5Hash(ctx context.Context) (MD5Hash, error) {
+func (p *photo) MD5Hash(ctx context.Context) (types.MD5Hash, error) {
 	return p.md5Hash, nil
 }
 
@@ -264,7 +265,7 @@ func (p *photo) Delete(ctx context.Context) (err error) {
 	}
 	defer resp.Body.Close()
 	defer io.Copy(io.Discard, resp.Body)
-	
+
 	if err := httpx.StatusError(resp); err != nil {
 		return err
 	}

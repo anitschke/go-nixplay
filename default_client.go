@@ -9,8 +9,9 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/anitschke/go-nixplay/auth"
 	"github.com/anitschke/go-nixplay/httpx"
+	"github.com/anitschke/go-nixplay/internal/auth"
+	"github.com/anitschke/go-nixplay/types"
 )
 
 //xxx move all the extra crap in the nixplay package into an internal package, things are starting to get messy
@@ -42,14 +43,14 @@ func NewDefaultClient(ctx context.Context, a auth.Authorization, opts DefaultCli
 	}, nil
 }
 
-func (c *DefaultClient) Containers(ctx context.Context, containerType ContainerType) ([]Container, error) {
+func (c *DefaultClient) Containers(ctx context.Context, containerType types.ContainerType) ([]Container, error) {
 	switch containerType {
-	case AlbumContainerType:
+	case types.AlbumContainerType:
 		return c.albums(ctx)
-	case PlaylistContainerType:
+	case types.PlaylistContainerType:
 		return c.playlists(ctx)
 	default:
-		return nil, ErrInvalidContainerType
+		return nil, types.ErrInvalidContainerType
 	}
 }
 
@@ -92,7 +93,7 @@ func (c *DefaultClient) playlists(ctx context.Context) ([]Container, error) {
 
 }
 
-func (c *DefaultClient) Container(ctx context.Context, containerType ContainerType, name string) (Container, error) {
+func (c *DefaultClient) Container(ctx context.Context, containerType types.ContainerType, name string) (Container, error) {
 	//xxx consider adding caching
 
 	containers, err := c.Containers(ctx, containerType)
@@ -109,14 +110,14 @@ func (c *DefaultClient) Container(ctx context.Context, containerType ContainerTy
 	return nil, ErrContainerNotFound
 }
 
-func (c *DefaultClient) CreateContainer(ctx context.Context, containerType ContainerType, name string) (Container, error) {
+func (c *DefaultClient) CreateContainer(ctx context.Context, containerType types.ContainerType, name string) (Container, error) {
 	switch containerType {
-	case AlbumContainerType:
+	case types.AlbumContainerType:
 		return c.createAlbum(ctx, name)
-	case PlaylistContainerType:
+	case types.PlaylistContainerType:
 		return c.createPlaylist(ctx, name)
 	default:
-		return nil, ErrInvalidContainerType
+		return nil, types.ErrInvalidContainerType
 	}
 }
 

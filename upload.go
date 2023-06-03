@@ -15,6 +15,7 @@ import (
 	"strconv"
 
 	"github.com/anitschke/go-nixplay/httpx"
+	"github.com/anitschke/go-nixplay/types"
 )
 
 type uploadContainerID struct {
@@ -24,7 +25,7 @@ type uploadContainerID struct {
 
 type uploadedPhoto struct {
 	name    string
-	md5Hash MD5Hash
+	md5Hash types.MD5Hash
 	size    int64
 }
 
@@ -57,7 +58,7 @@ func addPhoto(ctx context.Context, client httpx.Client, containerID uploadContai
 		return uploadedPhoto{}, err
 	}
 
-	md5Hash := MD5Hash(hasher.Sum(nil))
+	md5Hash := types.MD5Hash(hasher.Sum(nil))
 
 	//xxx add option to wait for upload to finish or not
 	if len(uploadNixplayResponse.UserUploadIDs) != 1 {

@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"io"
+
+	"github.com/anitschke/go-nixplay/types"
 )
 
 var (
@@ -70,27 +72,27 @@ type AddPhotoOptions struct {
 
 // xxx doc
 type Client interface {
-	Containers(ctx context.Context, containerType ContainerType) ([]Container, error)
+	Containers(ctx context.Context, containerType types.ContainerType) ([]Container, error)
 
 	// Container gets the specified container based on type and name.
 	//
 	// If the specified container could not be found then ErrContainerNotFound
 	// will be returned.
-	Container(ctx context.Context, containerType ContainerType, name string) (Container, error)
+	Container(ctx context.Context, containerType types.ContainerType, name string) (Container, error)
 
-	CreateContainer(ctx context.Context, containerType ContainerType, name string) (Container, error)
+	CreateContainer(ctx context.Context, containerType types.ContainerType, name string) (Container, error)
 }
 
 // xxx doc
 type Container interface {
-	ContainerType() ContainerType
+	ContainerType() types.ContainerType
 	Name() string
-	ID() ID
+	ID() types.ID
 
 	PhotoCount(ctx context.Context) (int64, error)
 	Photos(ctx context.Context) ([]Photo, error)
 	PhotosWithName(ctx context.Context, name string) ([]Photo, error)
-	PhotoWithID(ctx context.Context, id ID) (Photo, error) //xxx doc if no photo found then return nil
+	PhotoWithID(ctx context.Context, id types.ID) (Photo, error) //xxx doc if no photo found then return nil
 
 	Delete(ctx context.Context) error
 	AddPhoto(ctx context.Context, name string, r io.Reader, opts AddPhotoOptions) (Photo, error)
@@ -104,11 +106,11 @@ type Container interface {
 
 // xxx doc
 type Photo interface {
-	ID() ID
+	ID() types.ID
 
 	Name(ctx context.Context) (string, error)
 	Size(ctx context.Context) (int64, error)
-	MD5Hash(ctx context.Context) (MD5Hash, error)
+	MD5Hash(ctx context.Context) (types.MD5Hash, error)
 	URL(ctx context.Context) (string, error)
 
 	Open(ctx context.Context) (io.ReadCloser, error)

@@ -1,4 +1,4 @@
-package nixplay
+package types
 
 import (
 	"testing"

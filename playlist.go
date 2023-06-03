@@ -11,6 +11,7 @@ import (
 	"strconv"
 
 	"github.com/anitschke/go-nixplay/httpx"
+	"github.com/anitschke/go-nixplay/types"
 )
 
 //xxx all the data getting stored is the same and almost all the methods are the
@@ -18,7 +19,7 @@ import (
 
 type playlist struct {
 	name       string
-	id         ID
+	id         types.ID
 	photoCount int64
 
 	client    httpx.Client
@@ -28,7 +29,7 @@ type playlist struct {
 }
 
 func newPlaylist(client httpx.Client, name string, nixplayID uint64, photoCount int64) *playlist {
-	var id ID
+	var id types.ID
 	binary.LittleEndian.PutUint64(id[:], nixplayID)
 	id = sha256.Sum256(id[:])
 
@@ -47,15 +48,15 @@ func newPlaylist(client httpx.Client, name string, nixplayID uint64, photoCount 
 
 var _ = (Container)((*playlist)(nil))
 
-func (p *playlist) ContainerType() ContainerType {
-	return PlaylistContainerType
+func (p *playlist) ContainerType() types.ContainerType {
+	return types.PlaylistContainerType
 }
 
 func (p *playlist) Name() string {
 	return p.name
 }
 
-func (p *playlist) ID() ID {
+func (p *playlist) ID() types.ID {
 	return p.id
 }
 
@@ -103,7 +104,7 @@ func (p *playlist) PhotosWithName(ctx context.Context, name string) ([]Photo, er
 	return p.photoCache.PhotosWithName(ctx, name)
 }
 
-func (p *playlist) PhotoWithID(ctx context.Context, id ID) (Photo, error) {
+func (p *playlist) PhotoWithID(ctx context.Context, id types.ID) (Photo, error) {
 	return p.photoCache.PhotoWithID(ctx, id)
 }
 

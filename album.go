@@ -11,11 +11,12 @@ import (
 	"strconv"
 
 	"github.com/anitschke/go-nixplay/httpx"
+	"github.com/anitschke/go-nixplay/types"
 )
 
 type album struct {
 	name       string
-	id         ID
+	id         types.ID
 	photoCount int64
 
 	client    httpx.Client
@@ -25,7 +26,7 @@ type album struct {
 }
 
 func newAlbum(client httpx.Client, name string, nixplayID uint64, photoCount int64) *album {
-	var id ID
+	var id types.ID
 	binary.LittleEndian.PutUint64(id[:], nixplayID)
 	id = sha256.Sum256(id[:])
 
@@ -44,15 +45,15 @@ func newAlbum(client httpx.Client, name string, nixplayID uint64, photoCount int
 
 var _ = (Container)((*album)(nil))
 
-func (a *album) ContainerType() ContainerType {
-	return AlbumContainerType
+func (a *album) ContainerType() types.ContainerType {
+	return types.AlbumContainerType
 }
 
 func (a *album) Name() string {
 	return a.name
 }
 
-func (a *album) ID() ID {
+func (a *album) ID() types.ID {
 	return a.id
 }
 
@@ -96,7 +97,7 @@ func (a *album) PhotosWithName(ctx context.Context, name string) ([]Photo, error
 	return a.photoCache.PhotosWithName(ctx, name)
 }
 
-func (a *album) PhotoWithID(ctx context.Context, id ID) (Photo, error) {
+func (a *album) PhotoWithID(ctx context.Context, id types.ID) (Photo, error) {
 	return a.photoCache.PhotoWithID(ctx, id)
 }
 

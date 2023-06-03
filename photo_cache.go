@@ -3,6 +3,8 @@ package nixplay
 import (
 	"context"
 	"sync"
+
+	"github.com/anitschke/go-nixplay/types"
 )
 
 //xxx can this be made a generic cache for storing both photos and containers?
@@ -24,14 +26,14 @@ type photoCache struct {
 	foundAll     bool
 	photos       []Photo
 	nameToPhotos map[string][]Photo
-	idToPhoto    map[ID]Photo
+	idToPhoto    map[types.ID]Photo
 }
 
 func newPhotoCache(photoPageFunc photoPageFunc) *photoCache {
 	return &photoCache{
 		photoPageFunc: photoPageFunc,
 		nameToPhotos:  nil,
-		idToPhoto:     make(map[ID]Photo),
+		idToPhoto:     make(map[types.ID]Photo),
 	}
 }
 
@@ -85,7 +87,7 @@ func (pc *photoCache) PhotosWithName(ctx context.Context, name string) ([]Photo,
 
 // get the photo with the specified ID. In the event that there is no photo with the specified ID
 // a nil Photo is returned
-func (pc *photoCache) PhotoWithID(ctx context.Context, id ID) (Photo, error) {
+func (pc *photoCache) PhotoWithID(ctx context.Context, id types.ID) (Photo, error) {
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
 
@@ -247,7 +249,7 @@ func (pc *photoCache) Remove(ctx context.Context, p Photo) (err error) {
 	// Delete the photo from the idToPhoto map
 	delete(pc.idToPhoto, p.ID())
 
-    return nil
+	return nil
 }
 
 // Reset should be called in situations where the cache may no longer be valid
@@ -265,5 +267,5 @@ func (pc *photoCache) resetUnsafe() {
 	pc.foundAll = false
 	pc.photos = nil
 	pc.nameToPhotos = nil
-	pc.idToPhoto = make(map[ID]Photo)
+	pc.idToPhoto = make(map[types.ID]Photo)
 }

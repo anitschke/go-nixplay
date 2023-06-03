@@ -11,8 +11,9 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/anitschke/go-nixplay/auth"
-	"github.com/anitschke/go-nixplay/test-resources/photos"
+	"github.com/anitschke/go-nixplay/internal/auth"
+	"github.com/anitschke/go-nixplay/internal/test-resources/photos"
+	"github.com/anitschke/go-nixplay/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -40,7 +41,7 @@ func randomName() string {
 	return strconv.FormatUint(rand.Uint64(), 36)
 }
 
-func tempContainer(t *testing.T, client Client, containerType ContainerType) Container {
+func tempContainer(t *testing.T, client Client, containerType types.ContainerType) Container {
 	name := randomName()
 	container, err := client.CreateContainer(context.Background(), containerType, name)
 	require.NoError(t, err)
@@ -54,9 +55,9 @@ func tempContainer(t *testing.T, client Client, containerType ContainerType) Con
 }
 
 type containerData struct {
-	containerType ContainerType
+	containerType types.ContainerType
 	name          string
-	id            ID
+	id            types.ID
 	photoCount    int64
 }
 
@@ -75,10 +76,10 @@ func newContainerData(c Container) (containerData, error) {
 
 type photoData struct {
 	name string
-	id   ID
+	id   types.ID
 
 	size    int64
-	md5Hash MD5Hash
+	md5Hash types.MD5Hash
 	url     string
 }
 
@@ -139,13 +140,13 @@ func TestDefaultClient_Containers(t *testing.T) {
 	require.NoError(t, err)
 
 	type testData struct {
-		containerType           ContainerType
+		containerType           types.ContainerType
 		verifyInitialContainers func(containers []Container) (initialContainerNames []string)
 	}
 
 	tests := []testData{
 		{
-			containerType: AlbumContainerType,
+			containerType: types.AlbumContainerType,
 			verifyInitialContainers: func(containers []Container) []string {
 				// By default every nixplay account seems to have two albums.
 				// This album is the ${username}@mynixplay.com album. The other
@@ -164,7 +165,7 @@ func TestDefaultClient_Containers(t *testing.T) {
 			},
 		},
 		{
-			containerType: PlaylistContainerType,
+			containerType: types.PlaylistContainerType,
 			verifyInitialContainers: func(containers []Container) []string {
 				// By default every nixplay account seems to have two playlists.
 				// These are a playlist for the @mynixplay.com email address and
@@ -273,15 +274,15 @@ func TestDefaultClient_Containers(t *testing.T) {
 
 func TestDefaultClient_Photos(t *testing.T) {
 	type testData struct {
-		containerType ContainerType
+		containerType types.ContainerType
 	}
 
 	tests := []testData{
 		{
-			containerType: AlbumContainerType,
+			containerType: types.AlbumContainerType,
 		},
 		{
-			containerType: PlaylistContainerType,
+			containerType: types.PlaylistContainerType,
 		},
 	}
 
@@ -307,7 +308,7 @@ func TestDefaultClient_Photos(t *testing.T) {
 			//////////////////////////
 			addedPhotos := make([]Photo, 0, len(allTestPhotos))
 			photoNames := make([]string, 0, len(allTestPhotos))
-			photoIDs := make([]ID, 0, len(allTestPhotos))
+			photoIDs := make([]types.ID, 0, len(allTestPhotos))
 			for _, tp := range allTestPhotos {
 				file, err := tp.Open()
 				require.NoError(t, err)
@@ -321,7 +322,7 @@ func TestDefaultClient_Photos(t *testing.T) {
 				defer fileForHash.Close()
 				hasher := md5.New()
 				io.Copy(hasher, fileForHash)
-				md5Hash := MD5Hash(hasher.Sum(nil))
+				md5Hash := types.MD5Hash(hasher.Sum(nil))
 
 				actSize, err := p.Size(ctx)
 				assert.NoError(t, err)
@@ -345,7 +346,7 @@ func TestDefaultClient_Photos(t *testing.T) {
 			//////////////////////////
 			// Validate ID uniqueness
 			//////////////////////////
-			idMap := make(map[ID]struct{}, len(addedPhotoData))
+			idMap := make(map[types.ID]struct{}, len(addedPhotoData))
 			for _, d := range addedPhotoData {
 				idMap[d.id] = struct{}{}
 			}
