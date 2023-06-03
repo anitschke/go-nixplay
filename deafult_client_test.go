@@ -53,6 +53,26 @@ func tempContainer(t *testing.T, client Client, containerType ContainerType) Con
 	return container
 }
 
+type containerData struct {
+	containerType ContainerType
+	name          string
+	id            ID
+	photoCount    int64
+}
+
+func newContainerData(c Container) (containerData, error) {
+	photoCount, err := c.PhotoCount(context.Background())
+	if err != nil {
+		return containerData{}, err
+	}
+	return containerData{
+		containerType: c.ContainerType(),
+		name:          c.Name(),
+		id:            c.ID(),
+		photoCount:    photoCount,
+	}, nil
+}
+
 type photoData struct {
 	name string
 	id   ID
@@ -189,6 +209,9 @@ func TestDefaultClient_Containers(t *testing.T) {
 			assert.Equal(t, newContainer.Name(), newName)
 			assert.Equal(t, newContainer.ContainerType(), tc.containerType)
 
+			newContainerD, err := newContainerData(newContainer)
+			assert.NoError(t, err)
+
 			//////////////////////////
 			// List
 			//////////////////////////
@@ -214,7 +237,10 @@ func TestDefaultClient_Containers(t *testing.T) {
 			//////////////////////////
 			container, err = client.Container(ctx, tc.containerType, newName)
 			assert.NoError(t, err)
-			assert.Equal(t, container, newContainer)
+
+			containerD, err := newContainerData(container)
+			assert.NoError(t, err)
+			assert.Equal(t, containerD, newContainerD)
 
 			//////////////////////////
 			// Delete
