@@ -15,7 +15,7 @@ type AddPhotoOptions struct {
 	// extension, if it can not be inferred from extension of file it will throw
 	// a documented error.
 	//
-	// xxx this will use go standard library mime.TypeByExtension, but this is
+	// xxx doc this will use go standard library mime.TypeByExtension, but this is
 	// pretty limited in terms of list of extensions supported so we should use
 	// mime.AddExtensionType to add in all the image video mime types we can
 	// find. OR at least all the ones nixplay supports.
@@ -25,7 +25,7 @@ type AddPhotoOptions struct {
 	FileSize int64
 }
 
-// xxx Add comment in limitations section of doc that it is possible to remove a
+// xxx doc Add comment in limitations section of doc that it is possible to remove a
 // photo from an playlist without removing it from the album it lives in but for
 // the purpose of keeping things simple right now we don't support that. We just
 // always delete the photo from everywhere.
@@ -67,8 +67,6 @@ type AddPhotoOptions struct {
 // and deleting any that have the same hash. But this would be expensive... so
 // lets just error out for now if someone tries to use global for deleting a
 // photo from an album.
-
-//xxx I think it would be better to redesign all of this in a more OO way where we have methods on the container / photos
 
 // xxx doc
 type Client interface {

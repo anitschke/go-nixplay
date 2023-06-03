@@ -2,7 +2,6 @@ package httpx
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 )
@@ -14,11 +13,10 @@ func DoUnmarshalJSONResponse(client Client, request *http.Request, response any)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return errors.New(resp.Status)
+	if err := StatusError(resp); err != nil {
+		io.Copy(io.Discard, resp.Body)
+		return err
 	}
-
-	//xxx still read all even if there was an error so we can reuse
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

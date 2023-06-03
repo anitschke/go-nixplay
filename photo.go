@@ -224,10 +224,8 @@ func (p *photo) Open(ctx context.Context) (retReadCloser io.ReadCloser, err erro
 	}
 	if resp.StatusCode != http.StatusOK {
 		defer resp.Body.Close()
-		_, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, err
-		}
+		defer io.Copy(io.Discard, resp.Body)
+
 		return nil, errors.New(resp.Status)
 	}
 
@@ -265,12 +263,8 @@ func (p *photo) Delete(ctx context.Context) (err error) {
 		return err
 	}
 	defer resp.Body.Close()
-
-	// Read body so we can reuse http transport later
-	if _, err := io.ReadAll(resp.Body); err != nil {
-		return err
-	}
-
+	defer io.Copy(io.Discard, resp.Body)
+	
 	if err := httpx.StatusError(resp); err != nil {
 		return err
 	}

@@ -21,8 +21,8 @@ type playlist struct {
 	id         ID
 	photoCount int64
 
-	client     httpx.Client
-	nixplayID  uint64
+	client    httpx.Client
+	nixplayID uint64
 
 	photoCache *photoCache
 }
@@ -80,9 +80,8 @@ func (p *playlist) Delete(ctx context.Context) (err error) {
 		return err
 	}
 	defer resp.Body.Close()
-	if _, err = io.ReadAll(resp.Body); err != nil {
-		return err
-	}
+	defer io.Copy(io.Discard, resp.Body)
+
 	if err = httpx.StatusError(resp); err != nil {
 		return err
 	}

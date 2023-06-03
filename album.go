@@ -77,17 +77,9 @@ func (a *album) Delete(ctx context.Context) (err error) {
 		return err
 	}
 	defer resp.Body.Close()
+	defer io.Copy(io.Discard, resp.Body) //xxx track down any places where I may not be reading the response
 
-	// xxx change all places where I am doing this io.ReadAll to
-	//
-	// defer io.Copy(ioutil.Discard, res.Body)
-	if _, err = io.ReadAll(resp.Body); err != nil { //xxx change all places where I am doing this to
-		return err
-	}
-	if err = httpx.StatusError(resp); err != nil {
-		return err
-	}
-	return nil
+	return httpx.StatusError(resp)
 }
 
 func (a *album) Photos(ctx context.Context) (retPhotos []Photo, err error) {

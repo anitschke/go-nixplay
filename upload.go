@@ -254,19 +254,11 @@ func monitorUpload(ctx context.Context, client httpx.Client, monitorID string) (
 		return err
 	}
 	defer resp.Body.Close()
-
-	// Read whole body so we can reuse transport
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
+	defer io.Copy(io.Discard, resp.Body)
 
 	// xxx it seems like there is a bug in here where if you try to upload the
 	// same photo into two playlists then it errors out with a 400 saying the
 	// photo already exists. Need to look into this.
 
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("%s, %q", resp.Status, bodyBytes) //xxx work this into that helper function that errors if no ok function I have?
-	}
-	return nil
+	return httpx.StatusError(resp)
 }
