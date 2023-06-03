@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"errors"
 	"fmt"
 	"os"
 )
@@ -17,19 +16,15 @@ const (
 
 // xxx doc
 func TestAccountAuth() (Authorization, error) {
-	var err error
 	username := os.Getenv(testUsernameEnvVar)
-	if username == "" {
-		err = fmt.Errorf("the environment variable %q must be set to configure the Nixplay account used for testing", testUsernameEnvVar)
-	}
-
 	password := os.Getenv(testPasswordEnvVar)
-	if password == "" {
-		err = errors.Join(err, fmt.Errorf("the environment variable %q must be set to configure the Nixplay password used for testing", testPasswordEnvVar))
+
+	if username == "" || password == "" {
+		return Authorization{}, fmt.Errorf("the environment variables %q and %q must be set to configure the Nixplay account used for testing", testUsernameEnvVar, testPasswordEnvVar)
 	}
 
 	return Authorization{
 		Username: username,
 		Password: password,
-	}, err
+	}, nil
 }

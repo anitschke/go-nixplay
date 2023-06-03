@@ -91,6 +91,7 @@ type Container interface {
 
 	PhotoCount(ctx context.Context) (int64, error)
 	Photos(ctx context.Context) ([]Photo, error)
+	PhotosWithName(ctx context.Context, name string) ([]Photo, error)
 	PhotoWithID(ctx context.Context, id ID) (Photo, error) //xxx doc if no photo found then return nil
 
 	Delete(ctx context.Context) error

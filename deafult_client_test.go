@@ -1,13 +1,14 @@
 package nixplay
 
 import (
+	"bytes"
 	"context"
 	"crypto/md5"
+	"image/jpeg"
 	"io"
 	"math/rand"
 	"regexp"
 	"strconv"
-	"strings"
 	"testing"
 
 	"github.com/anitschke/go-nixplay/auth"
@@ -15,6 +16,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+//xxx Document expected starting state of the account for all of these tests
 
 var (
 	removeSignatureRegexp = regexp.MustCompile("Signature=[^&]*&")
@@ -106,7 +109,11 @@ func photoDataSlice(photos []Photo) ([]photoData, error) {
 	return data, nil
 }
 
-func TestDefaultClient_Containers_ListGetCreateListGetDeleteListGet(t *testing.T) {
+func TestDefaultClient_Containers(t *testing.T) {
+
+	auth, err := auth.TestAccountAuth()
+	require.NoError(t, err)
+
 	type testData struct {
 		containerType           ContainerType
 		verifyInitialContainers func(containers []Container) (initialContainerNames []string)
@@ -116,37 +123,39 @@ func TestDefaultClient_Containers_ListGetCreateListGetDeleteListGet(t *testing.T
 		{
 			containerType: AlbumContainerType,
 			verifyInitialContainers: func(containers []Container) []string {
-				// By default every nixplay account seems to have one album that can be
-				// deleted but seems to come back automatically. This album is the
-				// ${username}@mynixplay.com album. So we will check that it exists
-				assert.Len(t, containers, 1)
-				assert.Contains(t, containers[0].Name(), "@mynixplay.com")
-				return []string{containers[0].Name()}
+				// By default every nixplay account seems to have two albums.
+				// This album is the ${username}@mynixplay.com album. The other
+				// is a "My Uploads" album.
+				assert.Len(t, containers, 2)
+
+				var names []string
+				for _, c := range containers {
+					names = append(names, c.Name())
+				}
+
+				expNames := []string{auth.Username + "@mynixplay.com", "My Uploads"}
+				assert.ElementsMatch(t, names, expNames)
+
+				return names
 			},
 		},
 		{
 			containerType: PlaylistContainerType,
 			verifyInitialContainers: func(containers []Container) []string {
-				// By default every nixplay account seems to have two playlists that can not
-				// be deleted. These are a playlist for the @mynixplay.com email address and
+				// By default every nixplay account seems to have two playlists.
+				// These are a playlist for the @mynixplay.com email address and
 				// a favorites playlist.
 				assert.Len(t, containers, 2)
+
 				var names []string
-				var foundEmailPlaylist bool
-				var emailPlaylistName string
 				for _, c := range containers {
 					names = append(names, c.Name())
-					assert.Equal(t, c.ContainerType(), PlaylistContainerType)
-					isEmailPlaylist := strings.HasSuffix(c.Name(), "@mynixplay.com")
-					if isEmailPlaylist {
-						emailPlaylistName = c.Name()
-					}
-					foundEmailPlaylist = foundEmailPlaylist || isEmailPlaylist
 				}
-				assert.Contains(t, names, "Favorites")
-				assert.True(t, foundEmailPlaylist)
 
-				return []string{"Favorites", emailPlaylistName}
+				expNames := []string{auth.Username + "@mynixplay.com", "Favorites"}
+				assert.ElementsMatch(t, names, expNames)
+
+				return names
 			},
 		},
 	}
@@ -232,7 +241,7 @@ func TestDefaultClient_Containers_ListGetCreateListGetDeleteListGet(t *testing.T
 	}
 }
 
-func TestDefaultClient_Photo_ListAddListGetDownloadDeleteListGet(t *testing.T) {
+func TestDefaultClient_Photos(t *testing.T) {
 	type testData struct {
 		containerType ContainerType
 	}
@@ -267,6 +276,8 @@ func TestDefaultClient_Photo_ListAddListGetDownloadDeleteListGet(t *testing.T) {
 			// Add
 			//////////////////////////
 			addedPhotos := make([]Photo, 0, len(allTestPhotos))
+			photoNames := make([]string, 0, len(allTestPhotos))
+			photoIDs := make([]ID, 0, len(allTestPhotos))
 			for _, tp := range allTestPhotos {
 				file, err := tp.Open()
 				require.NoError(t, err)
@@ -290,10 +301,22 @@ func TestDefaultClient_Photo_ListAddListGetDownloadDeleteListGet(t *testing.T) {
 				assert.Equal(t, p.Name(), tp.Name)
 				assert.Equal(t, actSize, tp.Size)
 				assert.Equal(t, actMD5, md5Hash)
+
 				addedPhotos = append(addedPhotos, p)
+				photoNames = append(photoNames, tp.Name)
+				photoIDs = append(photoIDs, p.ID())
 			}
 			addedPhotoData, err := photoDataSlice(addedPhotos)
 			assert.NoError(t, err)
+
+			//////////////////////////
+			// Validate ID uniqueness
+			//////////////////////////
+			idMap := make(map[ID]struct{}, len(addedPhotoData))
+			for _, d := range addedPhotoData {
+				idMap[d.id] = struct{}{}
+			}
+			assert.Equal(t, len(idMap), len(addedPhotoData))
 
 			//////////////////////////
 			// List
@@ -307,14 +330,69 @@ func TestDefaultClient_Photo_ListAddListGetDownloadDeleteListGet(t *testing.T) {
 			assert.ElementsMatch(t, photosData, addedPhotoData)
 
 			//////////////////////////
-			// Get
+			// Get Photo By ID
 			//////////////////////////
-			// xxx TODO
+			for i, id := range photoIDs {
+				pWithId, err := container.PhotoWithID(ctx, id)
+				assert.NoError(t, err)
+				pWithIdData, err := newPhotoData(pWithId)
+				assert.NoError(t, err)
+				assert.Equal(t, addedPhotoData[i], pWithIdData)
+			}
+
+			//////////////////////////
+			// Get Photos By Name
+			//////////////////////////
+			for i, name := range photoNames {
+				photosWithName, err := container.PhotosWithName(ctx, name)
+				assert.NoError(t, err)
+				require.Len(t, photosWithName, 1)
+				pWithNameData, err := newPhotoData(photosWithName[0])
+				assert.NoError(t, err)
+				assert.Equal(t, addedPhotoData[i], pWithNameData)
+			}
 
 			//////////////////////////
 			// Download
 			//////////////////////////
-			// xxx TODO
+			for i, p := range addedPhotos {
+				tp := allTestPhotos[i]
+
+				var downloadedPhotoBytes bytes.Buffer
+				func() {
+					r, err := p.Open(ctx)
+					require.NoError(t, err)
+					defer func() {
+						err := r.Close()
+						assert.NoError(t, err)
+					}()
+					bytesCopied, err := io.Copy(&downloadedPhotoBytes, r)
+					require.NoError(t, err)
+					assert.Equal(t, bytesCopied, tp.Size)
+				}()
+
+				var localPhotoBytes bytes.Buffer
+				func() {
+					r, err := tp.Open()
+					require.NoError(t, err)
+					defer func() {
+						err := r.Close()
+						assert.NoError(t, err)
+					}()
+					bytesCopied, err := io.Copy(&localPhotoBytes, r)
+					require.NoError(t, err)
+					assert.Equal(t, bytesCopied, tp.Size)
+				}()
+
+				assert.Equal(t, downloadedPhotoBytes.Bytes(), localPhotoBytes.Bytes())
+
+				// Validate that both of the buffers are actually valid jpeg
+				// images
+				_, err := jpeg.Decode(&downloadedPhotoBytes)
+				assert.NoError(t, err)
+				_, err = jpeg.Decode(&localPhotoBytes)
+				assert.NoError(t, err)
+			}
 
 			//////////////////////////
 			// Delete
@@ -331,8 +409,6 @@ func TestDefaultClient_Photo_ListAddListGetDownloadDeleteListGet(t *testing.T) {
 				photosData, err = photoDataSlice(photos)
 				assert.NoError(t, err)
 				assert.ElementsMatch(t, photosData, expPhotoData)
-
-				//xxx also check get
 			}
 
 			//////////////////////////
@@ -343,9 +419,22 @@ func TestDefaultClient_Photo_ListAddListGetDownloadDeleteListGet(t *testing.T) {
 			assert.Empty(t, photos)
 
 			//////////////////////////
-			// Get
+			// Get Photo By ID
 			//////////////////////////
-			//xxx TODO
+			for _, id := range photoIDs {
+				pWithId, err := container.PhotoWithID(ctx, id)
+				assert.NoError(t, err)
+				assert.Nil(t, pWithId)
+			}
+
+			//////////////////////////
+			// Get Photos By Name
+			//////////////////////////
+			for _, name := range photoNames {
+				photosWithName, err := container.PhotosWithName(ctx, name)
+				assert.NoError(t, err)
+				assert.Empty(t, photosWithName)
+			}
 		})
 	}
 }

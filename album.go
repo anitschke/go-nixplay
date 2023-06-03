@@ -104,6 +104,10 @@ func (a *album) Photos(ctx context.Context) (retPhotos []Photo, err error) {
 	return a.photoCache.All(ctx)
 }
 
+func (a *album) PhotosWithName(ctx context.Context, name string) ([]Photo, error) {
+	return a.photoCache.PhotosWithName(ctx, name)
+}
+
 func (a *album) PhotoWithID(ctx context.Context, id ID) (Photo, error) {
 	return a.photoCache.PhotoWithID(ctx, id)
 }

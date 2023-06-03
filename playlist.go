@@ -102,6 +102,10 @@ func (p *playlist) Photos(ctx context.Context) (retPhotos []Photo, err error) {
 	return p.photoCache.All(ctx)
 }
 
+func (p *playlist) PhotosWithName(ctx context.Context, name string) ([]Photo, error) {
+	return p.photoCache.PhotosWithName(ctx, name)
+}
+
 func (p *playlist) PhotoWithID(ctx context.Context, id ID) (Photo, error) {
 	return p.photoCache.PhotoWithID(ctx, id)
 }

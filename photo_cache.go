@@ -30,7 +30,7 @@ type photoCache struct {
 func newPhotoCache(photoPageFunc photoPageFunc) *photoCache {
 	return &photoCache{
 		photoPageFunc: photoPageFunc,
-		nameToPhotos:  make(map[string][]Photo),
+		nameToPhotos:  nil,
 		idToPhoto:     make(map[ID]Photo),
 	}
 }
@@ -72,6 +72,10 @@ func (pc *photoCache) PhotosWithName(ctx context.Context, name string) ([]Photo,
 	defer pc.mu.Unlock()
 
 	if err := pc.loadAllUnsafe(ctx); err != nil {
+		return nil, err
+	}
+
+	if err := pc.populateNameMapUnsafe(ctx); err != nil {
 		return nil, err
 	}
 
@@ -141,14 +145,27 @@ func (pc *photoCache) Add(p Photo) {
 
 // addPhotoUnsafe adds a photo to the cache. It assumes the mutex guarding the
 // cache is already locked.
+//
+// the nameToPhotos map is not populated as part of this because sometimes
+// getting the name of a photo requires a network call (for playlists that were
+// not uploaded)
 func (pc *photoCache) addPhotoUnsafe(p Photo) {
 	pc.photos = append(pc.photos, p)
 
-	name := p.Name()
-	pc.nameToPhotos[name] = append(pc.nameToPhotos[name], p)
-
 	id := p.ID()
 	pc.idToPhoto[id] = p
+}
+
+func (pc *photoCache) populateNameMapUnsafe(ctx context.Context) error {
+	if pc.nameToPhotos != nil {
+		return nil
+	}
+	pc.nameToPhotos = make(map[string][]Photo)
+	for _, p := range pc.photos {
+		name := p.Name()
+		pc.nameToPhotos[name] = append(pc.nameToPhotos[name], p)
+	}
+	return nil
 }
 
 func (pc *photoCache) Remove(p Photo) {
@@ -169,9 +186,14 @@ func (pc *photoCache) Remove(p Photo) {
 	name := p.Name()
 	s := pc.nameToPhotos[name]
 	for i, possible := range s {
-		if p == possible {
+		if p.ID() == possible.ID() {
+			if len(s) == 1 {
+				delete(pc.nameToPhotos, name)
+				break
+			}
 			s[i] = s[len(s)-1]
-			pc.nameToPhotos[name] = s[:len(s)-1]
+			s = s[:len(s)-1]
+			pc.nameToPhotos[name] = s
 			break
 		}
 	}
@@ -194,6 +216,6 @@ func (pc *photoCache) resetUnsafe() {
 	pc.nextPage = 0
 	pc.foundAll = false
 	pc.photos = nil
-	pc.nameToPhotos = make(map[string][]Photo)
+	pc.nameToPhotos = nil
 	pc.idToPhoto = make(map[ID]Photo)
 }
