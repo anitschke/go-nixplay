@@ -49,17 +49,16 @@ type photo struct {
 	md5Hash MD5Hash
 
 	container  Container
-	authClient httpx.Client
 	client     httpx.Client
 
 	//xxx needs mutex for things that can be updated
 
-	nixplayID string //xxx change to uint64
+	nixplayID uint64 //xxx change to uint64 //xxx doc should be zero if unknown
 	size      int64
 	url       string
 }
 
-func newPhoto(container Container, authClient httpx.Client, client httpx.Client, name string, md5Hash *MD5Hash, nixplayID string, size int64, url string) (*photo, error) {
+func newPhoto(container Container, client httpx.Client, name string, md5Hash *MD5Hash, nixplayID uint64, size int64, url string) (*photo, error) {
 	// Based on current usage of newPhoto the MD5 hash should always be able to
 	// be provided, either because we are uploading a photo so we can do the
 	// hash ourselves, or because we are getting a list of photos and can
@@ -121,7 +120,6 @@ func newPhoto(container Container, authClient httpx.Client, client httpx.Client,
 		md5Hash: *md5Hash,
 
 		container:  container,
-		authClient: authClient,
 		client:     client,
 
 		nixplayID: nixplayID,
@@ -257,12 +255,12 @@ func (p *photo) Delete(ctx context.Context) (err error) {
 		return err
 	}
 
-	url := fmt.Sprintf("https://api.nixplay.com/picture/%s/delete/json/", nixplayID)
+	url := fmt.Sprintf("https://api.nixplay.com/picture/%d/delete/json/", nixplayID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader([]byte{}))
 	if err != nil {
 		return err
 	}
-	resp, err := p.authClient.Do(req)
+	resp, err := p.client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -280,14 +278,14 @@ func (p *photo) Delete(ctx context.Context) (err error) {
 	return p.container.onPhotoDelete(ctx, p)
 }
 
-func (p *photo) getNixplayID(ctx context.Context) (string, error) {
-	if p.nixplayID == "" {
+func (p *photo) getNixplayID(ctx context.Context) (uint64, error) {
+	if p.nixplayID == 0 {
 		if err := p.populatePhotoDataFromListSearch(ctx); err != nil {
-			return "", fmt.Errorf("failed to get internal Nixplay ID: %w", err)
+			return 0, fmt.Errorf("failed to get internal Nixplay ID: %w", err)
 		}
 	}
-	if p.nixplayID == "" {
-		return "", errors.New("unable to determine internal Nixplay ID")
+	if p.nixplayID == 0 {
+		return 0, errors.New("unable to determine internal Nixplay ID")
 	}
 	return p.nixplayID, nil
 }
@@ -307,15 +305,6 @@ func (p *photo) populatePhotoDataFromListSearch(ctx context.Context) error {
 	// But that data we want may not be in the cache, so if the data isn't there
 	// the first time around we need to reset the cache to force it to
 	// repopulate.
-
-	// xxx xxx LEFT OF HERE xxx xxx xxxxxx
-	//
-	// This call to Photos can't use the cache all the time because we need to
-	// get the full data from API request so we can populate the data we don't
-	// know. The easy fix for now would be to just always invalidate the cache
-	// when adding a new photo, but I don't know if I want to go down that path.
-	// Actually that might be the best option anyway since it will be easiest to
-	// code and I don't thing that big of a performance overhead.
 
 	found, err := p.attemptPopulatePhotoDataFromListSearch(ctx)
 	if err != nil {
@@ -345,14 +334,14 @@ func (p *photo) attemptPopulatePhotoDataFromListSearch(ctx context.Context) (boo
 		return false, err
 	}
 	if pFromContainer != nil {
-		pp, ok := pFromContainer.(*photo) //xxx should I add an API a.album.photos that gives it to me as photos so I don't need to cast?
+		ppFromContainer, ok := pFromContainer.(*photo) //xxx should I add an API a.album.photos that gives it to me as photos so I don't need to cast?
 		if !ok {
-			panic("failed to cast to *photo in populatePhotoDataFromListSearch")
+			return false, errors.New("failed to cast to *photo in populatePhotoDataFromListSearch")
 		}
 
-		if pp.nixplayID != "" && pp.url != "" {
-			p.nixplayID = pp.nixplayID
-			p.url = pp.url
+		if ppFromContainer.nixplayID != 0 && ppFromContainer.url != "" {
+			p.nixplayID = ppFromContainer.nixplayID
+			p.url = ppFromContainer.url
 			return true, nil
 		}
 	}
@@ -367,22 +356,18 @@ func (p *photo) populatePhotoDataFromPictureEndpoint(ctx context.Context) error 
 		return err
 	}
 
-	idAsInt, err := strconv.Atoi(id)
-	if err != nil {
-		return err
-	}
-	url := fmt.Sprintf("https://api.nixplay.com/picture/%d/", idAsInt)
+	url := fmt.Sprintf("https://api.nixplay.com/picture/%d/", id)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, bytes.NewReader(nil)) //xxx consider seeing if I can pass a nil reader in all these spots I am passing empty bytes
 	if err != nil {
 		return err
 	}
 
 	var nixplayPhoto nixplayAlbumPhoto
-	if err := httpx.DoUnmarshalJSONResponse(p.authClient, req, &nixplayPhoto); err != nil {
+	if err := httpx.DoUnmarshalJSONResponse(p.client, req, &nixplayPhoto); err != nil {
 		return err
 	}
 
-	photoFromPicEndpoint, err := nixplayPhoto.ToPhoto(p.container, p.authClient, p.client)
+	photoFromPicEndpoint, err := nixplayPhoto.ToPhoto(p.container, p.client)
 	if err != nil {
 		return err
 	}

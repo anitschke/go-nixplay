@@ -18,20 +18,18 @@ type album struct {
 	id         ID
 	photoCount int64
 
-	authClient httpx.Client
-	client     httpx.Client
-	nixplayID  uint64
+	client    httpx.Client
+	nixplayID uint64
 
 	photoCache *photoCache
 }
 
-func newAlbum(authClient httpx.Client, client httpx.Client, name string, nixplayID uint64, photoCount int64) *album {
+func newAlbum(client httpx.Client, name string, nixplayID uint64, photoCount int64) *album {
 	var id ID
 	binary.LittleEndian.PutUint64(id[:], nixplayID)
 	id = sha256.Sum256(id[:])
 
 	a := &album{
-		authClient: authClient,
 		client:     client,
 		name:       name,
 		id:         id,
@@ -74,7 +72,7 @@ func (a *album) Delete(ctx context.Context) (err error) {
 	if err != nil {
 		return err
 	}
-	resp, err := a.authClient.Do(req)
+	resp, err := a.client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -126,11 +124,11 @@ func (a *album) albumPhotosPage(ctx context.Context, page uint64) ([]Photo, erro
 	}
 
 	var albumPhotos albumPhotosResponse
-	if err := httpx.DoUnmarshalJSONResponse(a.authClient, req, &albumPhotos); err != nil {
+	if err := httpx.DoUnmarshalJSONResponse(a.client, req, &albumPhotos); err != nil {
 		return nil, err
 	}
 
-	return albumPhotos.ToPhotos(a, a.authClient, a.client)
+	return albumPhotos.ToPhotos(a, a.client)
 }
 
 func (a *album) AddPhoto(ctx context.Context, name string, r io.Reader, opts AddPhotoOptions) (Photo, error) {
@@ -139,14 +137,14 @@ func (a *album) AddPhoto(ctx context.Context, name string, r io.Reader, opts Add
 		id:     strconv.FormatUint(a.nixplayID, 10),
 	}
 
-	photoData, err := addPhoto(ctx, a.authClient, a.client, albumID, name, r, opts)
+	photoData, err := addPhoto(ctx, a.client, albumID, name, r, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	nixplayPhotoID := ""
+	nixplayPhotoID := uint64(0)
 	photoURL := ""
-	p, err := newPhoto(a, a.authClient, a.client, name, &photoData.md5Hash, nixplayPhotoID, photoData.size, photoURL)
+	p, err := newPhoto(a, a.client, name, &photoData.md5Hash, nixplayPhotoID, photoData.size, photoURL)
 	a.photoCache.Add(p)
 	return p, err
 }

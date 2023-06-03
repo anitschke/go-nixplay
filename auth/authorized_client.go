@@ -73,6 +73,12 @@ type auth struct {
 	jar       http.CookieJar
 }
 
+// AuthorizedClient is a httpx.Client that appends the required headers and
+// cookies when sending requests to Nixplay so that the requests are authorized
+//
+// It is safe to use AuthorizedClient to requests to other domains as well, when
+// this happens the client will do the right thing and will NOT authorize the
+// request.
 type AuthorizedClient struct {
 	client httpx.Client
 	auth   auth
@@ -161,6 +167,11 @@ func doAuth(ctx context.Context, client httpx.Client, authIn Authorization) (aut
 }
 
 func (c *AuthorizedClient) Do(req *http.Request) (*http.Response, error) {
+
+	if req.URL.Host != "api.nixplay.com" {
+		return c.client.Do(req)
+	}
+
 	for _, cookie := range c.auth.jar.Cookies(req.URL) {
 		req.AddCookie(cookie)
 	}

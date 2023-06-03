@@ -28,7 +28,7 @@ type uploadedPhoto struct {
 	size    int64
 }
 
-func addPhoto(ctx context.Context, authClient httpx.Client, client httpx.Client, containerID uploadContainerID, name string, r io.Reader, opts AddPhotoOptions) (retData uploadedPhoto, err error) {
+func addPhoto(ctx context.Context, client httpx.Client, containerID uploadContainerID, name string, r io.Reader, opts AddPhotoOptions) (retData uploadedPhoto, err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("failed to add photo: %w", err)
@@ -40,12 +40,12 @@ func addPhoto(ctx context.Context, authClient httpx.Client, client httpx.Client,
 		return uploadedPhoto{}, err
 	}
 
-	uploadToken, err := getUploadToken(ctx, authClient, containerID)
+	uploadToken, err := getUploadToken(ctx, client, containerID)
 	if err != nil {
 		return uploadedPhoto{}, err
 	}
 
-	uploadNixplayResponse, err := uploadNixplay(ctx, authClient, containerID, photoData, uploadToken)
+	uploadNixplayResponse, err := uploadNixplay(ctx, client, containerID, photoData, uploadToken)
 	if err != nil {
 		return uploadedPhoto{}, err
 	}
@@ -64,7 +64,7 @@ func addPhoto(ctx context.Context, authClient httpx.Client, client httpx.Client,
 		return uploadedPhoto{}, errors.New("unable to wait for photo to be uploaded")
 	}
 	monitorId := uploadNixplayResponse.UserUploadIDs[0]
-	if err := monitorUpload(ctx, authClient, monitorId); err != nil {
+	if err := monitorUpload(ctx, client, monitorId); err != nil {
 		return uploadedPhoto{}, err
 	}
 
@@ -103,7 +103,8 @@ func getUploadPhotoData(name string, r io.Reader, opts AddPhotoOptions) (uploadP
 	// file into memory, not ideal.
 	if data.FileSize == 0 {
 		if s, ok := r.(io.Seeker); ok {
-			size, err := s.Seek(0, io.SeekEnd)
+			var err error
+			data.FileSize, err = s.Seek(0, io.SeekEnd)
 			if err != nil {
 				return uploadPhotoData{}, nil, err
 			}
@@ -111,14 +112,13 @@ func getUploadPhotoData(name string, r io.Reader, opts AddPhotoOptions) (uploadP
 			if _, err := s.Seek(0, io.SeekStart); err != nil {
 				return uploadPhotoData{}, nil, err
 			}
-			data.FileSize = uint64(size)
 		} else {
+			var err error
 			buf := new(bytes.Buffer)
-			size, err := buf.ReadFrom(r)
+			data.FileSize, err = buf.ReadFrom(r)
 			if err != nil {
 				return uploadPhotoData{}, nil, err
 			}
-			data.FileSize = uint64(size)
 			r = buf
 		}
 	}
@@ -126,7 +126,7 @@ func getUploadPhotoData(name string, r io.Reader, opts AddPhotoOptions) (uploadP
 	return data, r, nil
 }
 
-func getUploadToken(ctx context.Context, authClient httpx.Client, containerID uploadContainerID) (returnedToken string, err error) {
+func getUploadToken(ctx context.Context, client httpx.Client, containerID uploadContainerID) (returnedToken string, err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("error getting upload token: %w", err)
@@ -144,14 +144,14 @@ func getUploadToken(ctx context.Context, authClient httpx.Client, containerID up
 	}
 
 	var response uploadTokenResponse
-	if err := httpx.DoUnmarshalJSONResponse(authClient, req, &response); err != nil {
+	if err := httpx.DoUnmarshalJSONResponse(client, req, &response); err != nil {
 		return "", err
 	}
 
 	return response.Token, nil
 }
 
-func uploadNixplay(ctx context.Context, authClient httpx.Client, containerID uploadContainerID, photo uploadPhotoData, token string) (returnedResponse uploadNixplayResponse, err error) {
+func uploadNixplay(ctx context.Context, client httpx.Client, containerID uploadContainerID, photo uploadPhotoData, token string) (returnedResponse uploadNixplayResponse, err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("error uploading to nixplay: %w", err)
@@ -163,7 +163,7 @@ func uploadNixplay(ctx context.Context, authClient httpx.Client, containerID upl
 		"uploadToken":      {token},
 		"fileName":         {photo.Name},
 		"fileType":         {photo.MIMEType},
-		"fileSize":         {strconv.Itoa(int(photo.FileSize))},
+		"fileSize":         {strconv.FormatInt(photo.FileSize, 10)},
 	}
 
 	req, err := httpx.NewPostFormRequest(ctx, "https://api.nixplay.com/v3/photo/upload/", form)
@@ -172,7 +172,7 @@ func uploadNixplay(ctx context.Context, authClient httpx.Client, containerID upl
 	}
 
 	var response uploadNixplayResponseContainer
-	if err := httpx.DoUnmarshalJSONResponse(authClient, req, &response); err != nil {
+	if err := httpx.DoUnmarshalJSONResponse(client, req, &response); err != nil {
 		return uploadNixplayResponse{}, err
 	}
 
@@ -237,7 +237,7 @@ func uploadS3(ctx context.Context, client httpx.Client, u uploadNixplayResponse,
 	return nil
 }
 
-func monitorUpload(ctx context.Context, authClient httpx.Client, monitorID string) (err error) {
+func monitorUpload(ctx context.Context, client httpx.Client, monitorID string) (err error) {
 	defer func() { //xxx do this sort of thing in more places
 		if err != nil {
 			err = fmt.Errorf("error monitoring upload: %w", err)
@@ -249,7 +249,7 @@ func monitorUpload(ctx context.Context, authClient httpx.Client, monitorID strin
 	if err != nil {
 		return err
 	}
-	resp, err := authClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}

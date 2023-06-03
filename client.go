@@ -22,7 +22,7 @@ type AddPhotoOptions struct {
 	MIMEType string
 
 	//xxx doc optional, if not specified it will be computed from reader
-	FileSize uint64
+	FileSize int64
 }
 
 // xxx Add comment in limitations section of doc that it is possible to remove a

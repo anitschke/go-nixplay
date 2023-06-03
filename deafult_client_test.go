@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-//xxx Document expected starting state of the account for all of these tests
+//xxx doc expected starting state of the account for all of these tests
 
 var (
 	removeSignatureRegexp = regexp.MustCompile("Signature=[^&]*&")

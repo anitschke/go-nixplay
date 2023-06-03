@@ -13,9 +13,6 @@ import (
 	"github.com/anitschke/go-nixplay/httpx"
 )
 
-//xxx there are a few places I use strconv.itoa(int(NUMBER)) for uint64. I
-//should switch to using strconv.FormatUint instead
-
 //xxx move all the extra crap in the nixplay package into an internal package, things are starting to get messy
 
 // xxx doc
@@ -25,9 +22,7 @@ type DefaultClientOptions struct {
 }
 
 type DefaultClient struct {
-	//xxx having these two clients everywhere is getting to be a bit of a pain, it would be nice to just reduce it to one
-	client     httpx.Client
-	authClient httpx.Client
+	client httpx.Client
 }
 
 var _ = (Client)((*DefaultClient)(nil))
@@ -37,14 +32,13 @@ func NewDefaultClient(ctx context.Context, a auth.Authorization, opts DefaultCli
 		opts.HTTPClient = &http.Client{}
 	}
 
-	authClient, err := auth.NewAuthorizedClient(ctx, opts.HTTPClient, a)
+	client, err := auth.NewAuthorizedClient(ctx, opts.HTTPClient, a)
 	if err != nil {
 		return nil, fmt.Errorf("authorization failed: %w", err)
 	}
 
 	return &DefaultClient{
-		client:     opts.HTTPClient,
-		authClient: authClient,
+		client: client,
 	}, nil
 }
 
@@ -78,10 +72,10 @@ func (c *DefaultClient) albumsFromURL(ctx context.Context, url string) ([]Contai
 	}
 
 	var albums albumsResponse
-	if err := httpx.DoUnmarshalJSONResponse(c.authClient, req, &albums); err != nil {
+	if err := httpx.DoUnmarshalJSONResponse(c.client, req, &albums); err != nil {
 		return nil, err
 	}
-	return albums.ToContainers(c.authClient, c.client), nil
+	return albums.ToContainers(c.client), nil
 }
 
 func (c *DefaultClient) playlists(ctx context.Context) ([]Container, error) {
@@ -91,10 +85,10 @@ func (c *DefaultClient) playlists(ctx context.Context) ([]Container, error) {
 	}
 
 	var playlists playlistsResponse
-	if err := httpx.DoUnmarshalJSONResponse(c.authClient, req, &playlists); err != nil {
+	if err := httpx.DoUnmarshalJSONResponse(c.client, req, &playlists); err != nil {
 		return nil, err
 	}
-	return playlists.ToContainers(c.authClient, c.client), nil
+	return playlists.ToContainers(c.client), nil
 
 }
 
@@ -136,14 +130,14 @@ func (c *DefaultClient) createAlbum(ctx context.Context, name string) (Container
 	}
 
 	var albums albumsResponse
-	if err := httpx.DoUnmarshalJSONResponse(c.authClient, req, &albums); err != nil {
+	if err := httpx.DoUnmarshalJSONResponse(c.client, req, &albums); err != nil {
 		return nil, err
 	}
 	if len(albums) != 1 {
 		return nil, errors.New("incorrect number of created containers returned")
 	}
 
-	return albums[0].ToContainer(c.authClient, c.client), nil
+	return albums[0].ToContainer(c.client), nil
 }
 
 func (c *DefaultClient) createPlaylist(ctx context.Context, name string) (Container, error) {
@@ -163,7 +157,7 @@ func (c *DefaultClient) createPlaylist(ctx context.Context, name string) (Contai
 	req.Header.Set("Content-Type", "application/json")
 
 	var createResponse createPlaylistResponse
-	if err := httpx.DoUnmarshalJSONResponse(c.authClient, req, &createResponse); err != nil {
+	if err := httpx.DoUnmarshalJSONResponse(c.client, req, &createResponse); err != nil {
 		return nil, err
 	}
 
@@ -171,5 +165,5 @@ func (c *DefaultClient) createPlaylist(ctx context.Context, name string) (Contai
 	// just assume that nixplay honored the exact name we asked it to create. I
 	// think this should be reasonably safe.
 	nPhotos := int64(0)
-	return newPlaylist(c.authClient, c.client, name, createResponse.PlaylistId, nPhotos), nil
+	return newPlaylist(c.client, name, createResponse.PlaylistId, nPhotos), nil
 }

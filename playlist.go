@@ -21,20 +21,18 @@ type playlist struct {
 	id         ID
 	photoCount int64
 
-	authClient httpx.Client
 	client     httpx.Client
 	nixplayID  uint64
 
 	photoCache *photoCache
 }
 
-func newPlaylist(authClient httpx.Client, client httpx.Client, name string, nixplayID uint64, photoCount int64) *playlist {
+func newPlaylist(client httpx.Client, name string, nixplayID uint64, photoCount int64) *playlist {
 	var id ID
 	binary.LittleEndian.PutUint64(id[:], nixplayID)
 	id = sha256.Sum256(id[:])
 
 	p := &playlist{
-		authClient: authClient,
 		client:     client,
 		name:       name,
 		id:         id,
@@ -77,7 +75,7 @@ func (p *playlist) Delete(ctx context.Context) (err error) {
 	if err != nil {
 		return err
 	}
-	resp, err := p.authClient.Do(req)
+	resp, err := p.client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -124,11 +122,11 @@ func (p *playlist) playlistPhotosPage(ctx context.Context, page uint64) ([]Photo
 	}
 
 	var playlistPhotos playlistPhotosResponse
-	if err := httpx.DoUnmarshalJSONResponse(p.authClient, req, &playlistPhotos); err != nil {
+	if err := httpx.DoUnmarshalJSONResponse(p.client, req, &playlistPhotos); err != nil {
 		return nil, err
 	}
 
-	return playlistPhotos.ToPhotos(p, p.authClient, p.client)
+	return playlistPhotos.ToPhotos(p, p.client)
 }
 
 func (p *playlist) AddPhoto(ctx context.Context, name string, r io.Reader, opts AddPhotoOptions) (Photo, error) {
@@ -137,15 +135,15 @@ func (p *playlist) AddPhoto(ctx context.Context, name string, r io.Reader, opts 
 		id:     strconv.FormatUint(p.nixplayID, 10),
 	}
 
-	photoData, err := addPhoto(ctx, p.authClient, p.client, albumID, name, r, opts)
+	photoData, err := addPhoto(ctx, p.client, albumID, name, r, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	nixplayPhotoID := ""
+	nixplayPhotoID := uint64(0)
 	photoURL := ""
 
-	photo, err := newPhoto(p, p.authClient, p.client, name, &photoData.md5Hash, nixplayPhotoID, photoData.size, photoURL)
+	photo, err := newPhoto(p, p.client, name, &photoData.md5Hash, nixplayPhotoID, photoData.size, photoURL)
 	p.photoCache.Add(photo)
 	return photo, err
 }
