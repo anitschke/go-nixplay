@@ -157,19 +157,17 @@ func md5HashFromPhotoURL(photoURL string) (returnHash MD5Hash, err error) {
 	return hash, nil
 }
 
-func (p *photo) Name() string {
+func (p *photo) Name(ctx context.Context) (string, error) {
 	if p.name == "" {
-		if err := p.populatePhotoDataFromPictureEndpoint(context.TODO()); err != nil { //xxx make sure I pass a context into every getter except for ID
-			//xxx return as error instead
-			panic(err.Error())
+		if err := p.populatePhotoDataFromPictureEndpoint(ctx); err != nil {
+			return "", err
 		}
 	}
 	if p.name == "" {
-		//xxx return as error instead
-		panic("failed to determine photo name")
+		return "", errors.New("failed to determine photo name")
 	}
 
-	return p.name
+	return p.name, nil
 }
 
 func (p *photo) ID() ID {
@@ -279,8 +277,7 @@ func (p *photo) Delete(ctx context.Context) (err error) {
 		return err
 	}
 
-	p.container.onPhotoDelete(p)
-	return nil
+	return p.container.onPhotoDelete(ctx, p)
 }
 
 func (p *photo) getNixplayID(ctx context.Context) (string, error) {
@@ -390,8 +387,8 @@ func (p *photo) populatePhotoDataFromPictureEndpoint(ctx context.Context) error 
 		return err
 	}
 
-	p.name = photoFromPicEndpoint.Name()
-	return nil
+	p.name, err = photoFromPicEndpoint.Name(ctx)
+	return err
 }
 
 func (p *photo) populatePhotoDataFromHead(ctx context.Context) error {

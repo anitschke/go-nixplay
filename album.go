@@ -25,8 +25,6 @@ type album struct {
 	photoCache *photoCache
 }
 
-//xxx add test setup code that deletes existing albums and playlists
-
 func newAlbum(authClient httpx.Client, client httpx.Client, name string, nixplayID uint64, photoCount int64) *album {
 	var id ID
 	binary.LittleEndian.PutUint64(id[:], nixplayID)
@@ -157,6 +155,6 @@ func (a *album) ResetCache() {
 	a.photoCache.Reset()
 }
 
-func (a *album) onPhotoDelete(p Photo) {
-	a.photoCache.Remove(p)
+func (a *album) onPhotoDelete(ctx context.Context, photo Photo) error {
+	return a.photoCache.Remove(ctx, photo)
 }

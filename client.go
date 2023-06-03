@@ -101,14 +101,14 @@ type Container interface {
 	ResetCache()
 
 	//xxx clean this up, needed to remove the photo from the container's cache, but it shouldn't belong on this interface
-	onPhotoDelete(p Photo)
+	onPhotoDelete(ctx context.Context, p Photo) error
 }
 
 // xxx doc
 type Photo interface {
-	Name() string
 	ID() ID
 
+	Name(ctx context.Context) (string, error)
 	Size(ctx context.Context) (int64, error)
 	MD5Hash(ctx context.Context) (MD5Hash, error)
 	URL(ctx context.Context) (string, error)

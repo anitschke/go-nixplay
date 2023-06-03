@@ -154,6 +154,6 @@ func (p *playlist) ResetCache() {
 	p.photoCache.Reset()
 }
 
-func (p *playlist) onPhotoDelete(photo Photo) {
-	p.photoCache.Remove(photo)
+func (p *playlist) onPhotoDelete(ctx context.Context, photo Photo) error {
+	return p.photoCache.Remove(ctx, photo)
 }

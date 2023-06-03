@@ -93,11 +93,15 @@ func sanitizePhotoURL(photoURL string) string {
 func newPhotoData(photo Photo) (photoData, error) {
 	ctx := context.Background()
 	data := photoData{
-		name: photo.Name(),
-		id:   photo.ID(),
+		id: photo.ID(),
 	}
 
 	var err error
+	data.name, err = photo.Name(ctx)
+	if err != nil {
+		return photoData{}, err
+	}
+
 	data.size, err = photo.Size(ctx)
 	if err != nil {
 		return photoData{}, err
@@ -324,7 +328,10 @@ func TestDefaultClient_Photos(t *testing.T) {
 				actMD5, err := p.MD5Hash(ctx)
 				assert.NoError(t, err)
 
-				assert.Equal(t, p.Name(), tp.Name)
+				name, err := p.Name(ctx)
+				assert.NoError(t, err)
+				assert.Equal(t, name, tp.Name)
+
 				assert.Equal(t, actSize, tp.Size)
 				assert.Equal(t, actMD5, md5Hash)
 
