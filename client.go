@@ -80,6 +80,8 @@ type Client interface {
 	//
 	// If the specified container could not be found then ErrContainerNotFound
 	// will be returned.
+	//
+	// xxx I don't need ErrContainerNotFound anymore since I can now just return a nil container
 	Container(ctx context.Context, containerType types.ContainerType, name string) (Container, error)
 
 	CreateContainer(ctx context.Context, containerType types.ContainerType, name string) (Container, error)
@@ -87,10 +89,10 @@ type Client interface {
 
 // xxx doc
 type Container interface {
-	ContainerType() types.ContainerType
-	Name() string
 	ID() types.ID
+	ContainerType() types.ContainerType
 
+	Name(ctx context.Context) (string, error)
 	PhotoCount(ctx context.Context) (int64, error)
 	Photos(ctx context.Context) ([]Photo, error)
 	PhotosWithName(ctx context.Context, name string) ([]Photo, error)

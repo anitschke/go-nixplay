@@ -38,11 +38,12 @@ type container struct {
 
 func newContainer(client httpx.Client, containerType types.ContainerType, name string, nixplayID uint64, photoCount int64, photoPageFunc photoPageFunc, deleteRequestFunc deleteRequestFunc, addIDName string) *container {
 
-	//xxx add containertype to the id/hash since we could have two containers of different types with same ID
-
-	var id types.ID
-	binary.LittleEndian.PutUint64(id[:], nixplayID)
-	id = sha256.Sum256(id[:])
+	nixplayIdAsBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(nixplayIdAsBytes, nixplayID)
+	hasher := sha256.New()
+	hasher.Write([]byte(containerType))
+	hasher.Write(nixplayIdAsBytes)
+	id := types.ID(hasher.Sum([]byte{}))
 
 	c := &container{
 		containerType:     containerType,
@@ -67,8 +68,10 @@ func (c *container) ContainerType() types.ContainerType {
 	return c.containerType
 }
 
-func (c *container) Name() string {
-	return c.name
+func (c *container) Name(ctx context.Context) (string, error) {
+	// While we don't need the context and won't ever produce an error we will
+	// still use this API so it has a consistent interface as Photo.Name().
+	return c.name, nil
 }
 
 func (c *container) ID() types.ID {

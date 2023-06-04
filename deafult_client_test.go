@@ -66,9 +66,13 @@ func newContainerData(c Container) (containerData, error) {
 	if err != nil {
 		return containerData{}, err
 	}
+	name, err := c.Name(context.Background())
+	if err != nil {
+		return containerData{}, err
+	}
 	return containerData{
 		containerType: c.ContainerType(),
-		name:          c.Name(),
+		name:          name,
 		id:            c.ID(),
 		photoCount:    photoCount,
 	}, nil
@@ -155,7 +159,9 @@ func TestDefaultClient_Containers(t *testing.T) {
 
 				var names []string
 				for _, c := range containers {
-					names = append(names, c.Name())
+					name, err := c.Name(context.Background())
+					assert.NoError(t, err)
+					names = append(names, name)
 				}
 
 				expNames := []string{auth.Username + "@mynixplay.com", "My Uploads"}
@@ -174,7 +180,9 @@ func TestDefaultClient_Containers(t *testing.T) {
 
 				var names []string
 				for _, c := range containers {
-					names = append(names, c.Name())
+					name, err := c.Name(context.Background())
+					assert.NoError(t, err)
+					names = append(names, name)
 				}
 
 				expNames := []string{auth.Username + "@mynixplay.com", "Favorites"}
@@ -211,7 +219,9 @@ func TestDefaultClient_Containers(t *testing.T) {
 			//////////////////////////
 			newContainer, err := client.CreateContainer(ctx, tc.containerType, newName)
 			assert.NoError(t, err)
-			assert.Equal(t, newContainer.Name(), newName)
+			name, err := newContainer.Name(ctx)
+			assert.NoError(t, err)
+			assert.Equal(t, name, newName)
 			assert.Equal(t, newContainer.ContainerType(), tc.containerType)
 
 			newContainerD, err := newContainerData(newContainer)
@@ -226,7 +236,9 @@ func TestDefaultClient_Containers(t *testing.T) {
 			getNamesAndCheckContainerType := func(containers []Container) []string {
 				names := []string{}
 				for _, c := range containers {
-					names = append(names, c.Name())
+					name, err := c.Name(ctx)
+					assert.NoError(t, err)
+					names = append(names, name)
 					assert.Equal(t, c.ContainerType(), tc.containerType)
 				}
 				return names

@@ -92,7 +92,7 @@ func (c *DefaultClient) playlists(ctx context.Context) ([]Container, error) {
 }
 
 func (c *DefaultClient) Container(ctx context.Context, containerType types.ContainerType, name string) (Container, error) {
-	//xxx consider adding caching
+	//xxx add caching of containers
 
 	containers, err := c.Containers(ctx, containerType)
 	if err != nil {
@@ -100,7 +100,11 @@ func (c *DefaultClient) Container(ctx context.Context, containerType types.Conta
 	}
 
 	for _, c := range containers {
-		if c.Name() == name {
+		cName, err := c.Name(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if cName == name {
 			return c, nil
 		}
 	}
