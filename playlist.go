@@ -114,7 +114,7 @@ func (p *playlist) PhotoWithID(ctx context.Context, id types.ID) (Photo, error) 
 // it will work by adding a test that adds 1000 photos (this is more than
 // default size for either album or playlist)
 func (p *playlist) playlistPhotosPage(ctx context.Context, page uint64) ([]Photo, error) {
-	limit := uint64(100) //same limit used by nixplay.com when getting photos
+	limit := uint64(photoPageSize) //same limit used by nixplay.com when getting photos
 	offset := page * limit
 	url := fmt.Sprintf("https://api.nixplay.com/v3/playlists/%d/slides?size=%d&offset=%d", p.nixplayID, limit, offset)
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, bytes.NewReader([]byte{}))

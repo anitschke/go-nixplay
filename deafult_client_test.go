@@ -364,6 +364,18 @@ func TestDefaultClient_Photos(t *testing.T) {
 			assert.ElementsMatch(t, photosData, addedPhotoData)
 
 			//////////////////////////
+			// Reset Cache And List
+			//////////////////////////
+			container.ResetCache()
+			photos, err = container.Photos(ctx)
+			assert.NoError(t, err)
+			assert.Len(t, photos, len(addedPhotos))
+
+			photosData, err = photoDataSlice(photos)
+			assert.NoError(t, err)
+			assert.ElementsMatch(t, photosData, addedPhotoData)
+
+			//////////////////////////
 			// Get Photo By ID
 			//////////////////////////
 			for i, id := range photoIDs {

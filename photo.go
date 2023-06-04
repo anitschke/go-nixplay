@@ -35,7 +35,7 @@ var sizeFromContentRangeRegexp = regexp.MustCompile(`^bytes \d+-\d+/(\d+)$`)
 // However rather than parse the entire URL with the regexp we will use
 // url.Parse to parse the URL and then just use the regexp to parse the path of
 // the url. ie "/3293355/3293355_073089b1d67a56c63b989d4e5f660ab8.jpg"
-var md5HashFromPhotoURLPath = regexp.MustCompile(`^/\d+/\d+_([A-Fa-f0-9]{32}).jpg$`)
+var md5HashFromPhotoURLPath = regexp.MustCompile(`^/\d+/\d+_([A-Fa-f0-9]{32})`)
 
 // photo is the type that implements the Photo interface.
 //

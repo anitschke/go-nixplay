@@ -116,22 +116,18 @@ type uploadTokenResponse struct {
 	Token string `json:"token"`
 }
 
-// xxx remove stuff you don't need
 type uploadNixplayResponseContainer struct {
 	Data uploadNixplayResponse `json:"data"`
 }
 
-// xxx remove unused stuff
 type uploadNixplayResponse struct {
 	ACL            string `json:"acl"`
 	Key            string `json:"key"`
 	AWSAccessKeyID string `json:"AWSAccessKeyId"`
 	Policy         string `json:"Policy"`
 	Signature      string `json:"Signature"`
-	// UserUploadID   string   `json:"userUploadId"`
 	BatchUploadID string   `json:"batchUploadId"`
 	UserUploadIDs []string `json:"userUploadIds"`
 	FileType      string   `json:"fileType"`
-	// FileSize       int      `json:"fileSize"`
 	S3UploadURL string `json:"s3UploadUrl"`
 }

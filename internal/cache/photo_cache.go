@@ -7,9 +7,6 @@ import (
 	"github.com/anitschke/go-nixplay/types"
 )
 
-//xxx can this be made a generic cache for storing both photos and containers?
-//perhaps with generics?
-
 type Element interface {
 	ID() types.ID
 	Name(ctx context.Context) (string, error)
@@ -44,10 +41,6 @@ func NewCache[T Element](elementPageFunc elementPageFunc[T]) *Cache[T] {
 }
 
 //xxx add tests, could deadlock with all this mutex use
-
-//xxx add a panic/assert to all unsafe methods that mutex is already locked, at least for now
-
-//xxx add ability to turn off caching for testing
 
 //xxx add ability for external code to add/remove photos from cache so we can
 //handle add and remove of photos
@@ -145,11 +138,11 @@ func (c *Cache[T]) loadNextPageUnsafe(ctx context.Context) ([]T, error) {
 
 // Add may be called to add a element to the cache. This can be useful when a
 // element is created
-func (pc *Cache[T]) Add(e T) {
-	pc.mu.Lock()
-	defer pc.mu.Unlock()
+func (c *Cache[T]) Add(e T) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	pc.addElementUnsafe(e)
+	c.addElementUnsafe(e)
 }
 
 // addElementUnsafe adds a element to the cache. It assumes the mutex guarding the

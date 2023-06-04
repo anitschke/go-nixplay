@@ -15,6 +15,8 @@ import (
 	"github.com/anitschke/go-nixplay/types"
 )
 
+const photoPageSize = 100
+
 type album struct {
 	name       string
 	id         types.ID
@@ -110,7 +112,7 @@ func (a *album) albumPhotosPage(ctx context.Context, page uint64) ([]Photo, erro
 	page++ // nixplay uses 1 based indexing for album pages but photoCache assumes 0 based.
 
 	//xxx test multiple pages somehow
-	limit := 500 //same limit used by nixplay.com when getting photos
+	limit := photoPageSize //same limit used by nixplay.com when getting photos
 	url := fmt.Sprintf("https://api.nixplay.com/album/%d/pictures/json/?page=%d&limit=%d", a.nixplayID, page, limit)
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, bytes.NewReader([]byte{}))
 	if err != nil {
