@@ -55,7 +55,7 @@ func addPhoto(ctx context.Context, client httpx.Client, containerID uploadContai
 		return uploadedPhoto{}, err
 	}
 
-	md5Hash := types.MD5Hash(hasher.Sum(nil))
+	md5Hash := *(*types.MD5Hash)(hasher.Sum(nil))
 
 	if len(uploadNixplayResponse.UserUploadIDs) != 1 {
 		return uploadedPhoto{}, errors.New("unable to wait for photo to be uploaded")

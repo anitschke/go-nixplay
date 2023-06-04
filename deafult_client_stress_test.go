@@ -24,7 +24,7 @@ func TestDefaultClient_Photos_Stress(t *testing.T) {
 	const stressTestPhotoCount = 120
 	const maxConcurrentRequests = 20
 
-	assert.Greater(t, stressTestPhotoCount, photoPageSize)
+	assert.Greater(t, uint64(stressTestPhotoCount), photoPageSize)
 
 	type testData struct {
 		containerType types.ContainerType

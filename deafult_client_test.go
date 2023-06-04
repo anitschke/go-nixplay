@@ -334,7 +334,7 @@ func TestDefaultClient_Photos(t *testing.T) {
 				defer fileForHash.Close()
 				hasher := md5.New()
 				io.Copy(hasher, fileForHash)
-				md5Hash := types.MD5Hash(hasher.Sum(nil))
+				md5Hash := *(*types.MD5Hash)(hasher.Sum(nil))
 
 				actSize, err := p.Size(ctx)
 				assert.NoError(t, err)

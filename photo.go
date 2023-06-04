@@ -120,7 +120,7 @@ func newPhoto(container Container, client httpx.Client, name string, md5Hash *ty
 	hasher := sha256.New()
 	hasher.Write(containerID[:]) // shouldn't ever error so we don't need to check for one
 	hasher.Write(md5Hash[:])
-	id := types.ID(hasher.Sum([]byte{}))
+	id := *(*types.ID)(hasher.Sum([]byte{}))
 
 	return &photo{
 		name:    name,

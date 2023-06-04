@@ -43,7 +43,7 @@ func newContainer(client httpx.Client, containerType types.ContainerType, name s
 	hasher := sha256.New()
 	hasher.Write([]byte(containerType))
 	hasher.Write(nixplayIdAsBytes)
-	id := types.ID(hasher.Sum([]byte{}))
+	id := *(*types.ID)(hasher.Sum([]byte{}))
 
 	c := &container{
 		containerType:     containerType,
