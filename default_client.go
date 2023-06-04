@@ -14,8 +14,6 @@ import (
 	"github.com/anitschke/go-nixplay/types"
 )
 
-//xxx move all the extra crap in the nixplay package into an internal package, things are starting to get messy
-
 // xxx doc
 type DefaultClientOptions struct {
 	// xxx doc optional
@@ -67,7 +65,7 @@ func (c *DefaultClient) albums(ctx context.Context) ([]Container, error) {
 }
 
 func (c *DefaultClient) albumsFromURL(ctx context.Context, url string) ([]Container, error) {
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, bytes.NewReader([]byte{}))
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +78,7 @@ func (c *DefaultClient) albumsFromURL(ctx context.Context, url string) ([]Contai
 }
 
 func (c *DefaultClient) playlists(ctx context.Context) ([]Container, error) {
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "https://api.nixplay.com/v3/playlists", bytes.NewReader([]byte{}))
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "https://api.nixplay.com/v3/playlists", http.NoBody)
 	if err != nil {
 		return nil, err
 	}

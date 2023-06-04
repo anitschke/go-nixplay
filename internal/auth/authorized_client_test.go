@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -60,7 +59,7 @@ func TestAuthorizedClient_SendRequest(t *testing.T) {
 	require.NoError(t, err)
 
 	userProfileURL := "https://api.nixplay.com/user/profile/edit/"
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, userProfileURL, bytes.NewReader([]byte{}))
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, userProfileURL, http.NoBody)
 	require.NoError(t, err)
 
 	resp, err := authClient.Do(req)

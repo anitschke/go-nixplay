@@ -25,7 +25,6 @@ type Cache[T Element] struct {
 	elementPageFunc elementPageFunc[T]
 
 	mu             sync.Mutex
-	nextPage       uint64
 	foundAll       bool
 	elements       []T
 	nameToElements map[string][]T
@@ -40,13 +39,6 @@ func NewCache[T Element](elementPageFunc elementPageFunc[T]) *Cache[T] {
 	}
 }
 
-//xxx add tests, could deadlock with all this mutex use
-
-//xxx add ability for external code to add/remove photos from cache so we can
-//handle add and remove of photos
-
-//
-
 // All will return all elements
 //
 // If all elements for this container are already in the cache then it will return
@@ -57,13 +49,13 @@ func (c *Cache[T]) All(ctx context.Context) ([]T, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// xxx simplify all this because now I don't have a walk function (because it might deadlock)
-
 	if err := c.loadAllUnsafe(ctx); err != nil {
 		return nil, err
 	}
 
-	return c.elements, nil //xxx in theory we should make a copy of this slice so it can't get modified on the outside
+	elements := make([]T, len(c.elements))
+	copy(elements, c.elements)
+	return elements, nil
 }
 
 // get elements with a specific name. In the event that there are no elements with
@@ -80,7 +72,9 @@ func (c *Cache[T]) PhotosWithName(ctx context.Context, name string) ([]T, error)
 		return nil, err
 	}
 
-	elements := c.nameToElements[name]
+	elementsWithName := c.nameToElements[name]
+	elements := make([]T, len(elementsWithName))
+	copy(elements, elementsWithName)
 	return elements, nil
 }
 
@@ -101,39 +95,20 @@ func (c *Cache[T]) PhotoWithID(ctx context.Context, id types.ID) (T, error) {
 // Load all elements into the cache. It assumes the mutex guarding the
 // cache is already locked.
 func (c *Cache[T]) loadAllUnsafe(ctx context.Context) (err error) {
-	for !c.foundAll {
-		_, err := c.loadNextPageUnsafe(ctx)
+	for page := uint64(0); !c.foundAll; page++ {
+		elements, err := c.elementPageFunc(ctx, page)
 		if err != nil {
 			return err
+		}
+		if len(elements) == 0 {
+			c.foundAll = true
+		}
+		for _, p := range elements {
+			c.addElementUnsafe(p)
 		}
 	}
 
 	return nil
-}
-
-// loads the next page into the cache. It assumes the mutex guarding the cache
-// is already locked. Any new elements loaded as part of the next page will be
-// returned
-func (c *Cache[T]) loadNextPageUnsafe(ctx context.Context) ([]T, error) {
-	// xxx I think we can leave the size an offset off to just get all the photos in
-	// one page. This simplifies things a lot. before you make this change confirm
-	// it will work by adding a test that adds 1000 photos (this is more than
-	// default size for either album or playlist)
-
-	elements, err := c.elementPageFunc(ctx, c.nextPage)
-	if err != nil {
-		return nil, err
-	}
-	if len(elements) == 0 {
-		c.foundAll = true
-	}
-	for _, p := range elements {
-		c.addElementUnsafe(p)
-	}
-
-	c.nextPage++
-
-	return elements, nil
 }
 
 // Add may be called to add a element to the cache. This can be useful when a
@@ -162,8 +137,6 @@ func (c *Cache[T]) addElementUnsafe(p T) {
 
 	c.elements = append(c.elements, p)
 
-	// xxx we should probably also make filling the ID map on demand to in order
-	// to save memory and processing power if we don't actually need it.
 	id := p.ID()
 	c.idToElement[id] = p
 
@@ -265,7 +238,6 @@ func (c *Cache[T]) Reset() {
 // resetUnsafe does the same as Reset but assumes that the mutex guarding the
 // cache is already locked
 func (c *Cache[T]) resetUnsafe() {
-	c.nextPage = 0
 	c.foundAll = false
 	c.elements = nil
 	c.nameToElements = nil

@@ -1,7 +1,6 @@
 package nixplay
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"errors"
@@ -55,7 +54,7 @@ type photo struct {
 
 	//xxx needs mutex for things that can be updated
 
-	nixplayID uint64 //xxx change to uint64 //xxx doc should be zero if unknown
+	nixplayID uint64 //xxx doc should be zero if unknown
 	size      int64
 	url       string
 }
@@ -209,7 +208,7 @@ func (p *photo) Open(ctx context.Context) (retReadCloser io.ReadCloser, err erro
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, photoURL, bytes.NewReader([]byte{})) //xxx consider seeing if I can pass a nil reader in all these spots I am passing empty bytes
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, photoURL, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -246,7 +245,7 @@ func (p *photo) Delete(ctx context.Context) (err error) {
 	}
 
 	url := fmt.Sprintf("https://api.nixplay.com/picture/%d/delete/json/", nixplayID)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader([]byte{}))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, http.NoBody)
 	if err != nil {
 		return err
 	}
@@ -322,7 +321,7 @@ func (p *photo) attemptPopulatePhotoDataFromListSearch(ctx context.Context) (boo
 		return false, err
 	}
 	if pFromContainer != nil {
-		ppFromContainer, ok := pFromContainer.(*photo) //xxx should I add an API a.album.photos that gives it to me as photos so I don't need to cast?
+		ppFromContainer, ok := pFromContainer.(*photo)
 		if !ok {
 			return false, errors.New("failed to cast to *photo in populatePhotoDataFromListSearch")
 		}
@@ -347,7 +346,7 @@ func (p *photo) populatePhotoDataFromPictureEndpoint(ctx context.Context) (err e
 	}
 
 	url := fmt.Sprintf("https://api.nixplay.com/picture/%d/", id)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, bytes.NewReader(nil)) //xxx consider seeing if I can pass a nil reader in all these spots I am passing empty bytes
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return err
 	}
@@ -369,7 +368,7 @@ func (p *photo) populatePhotoDataFromPictureEndpoint(ctx context.Context) (err e
 func (p *photo) populatePhotoDataFromHead(ctx context.Context) (err error) {
 	// xxx doc Getting the size of the photo is a little tricky. Ideally we could
 	// use the HEAD method but the way s3 Signature works is it is for a
-	// specific method. xxx add rest of details
+	// specific method. xxx doc add rest of details
 	//
 	// https://stackoverflow.com/a/39663152 curl -v -r 0-0
 	//
@@ -384,7 +383,7 @@ func (p *photo) populatePhotoDataFromHead(ctx context.Context) (err error) {
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, photoURL, bytes.NewReader(nil)) //xxx consider seeing if I can pass a nil reader in all these spots I am passing empty bytes
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, photoURL, http.NoBody)
 	if err != nil {
 		return err
 	}

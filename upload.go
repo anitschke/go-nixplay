@@ -57,7 +57,6 @@ func addPhoto(ctx context.Context, client httpx.Client, containerID uploadContai
 
 	md5Hash := types.MD5Hash(hasher.Sum(nil))
 
-	//xxx add option to wait for upload to finish or not
 	if len(uploadNixplayResponse.UserUploadIDs) != 1 {
 		return uploadedPhoto{}, errors.New("unable to wait for photo to be uploaded")
 	}
@@ -214,7 +213,7 @@ func uploadS3(ctx context.Context, client httpx.Client, u uploadNixplayResponse,
 	req.Header.Set("content-type", fmt.Sprintf("multipart/form-data; boundary=%s", writer.Boundary()))
 	req.Header.Set("origin", "https://app.nixplay.com")
 	req.Header.Set("referer", "https://app.nixplay.com")
-	resp, err := http.DefaultClient.Do(req) // xxx don't use the deafult client, use the not-authourized one we were provided
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -229,7 +228,7 @@ func monitorUpload(ctx context.Context, client httpx.Client, monitorID string) (
 	defer errorx.WrapWithFuncNameIfError(&err)
 
 	url := fmt.Sprintf("https://upload-monitor.nixplay.com/status?id=%s", monitorID)
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, bytes.NewReader([]byte{}))
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return err
 	}

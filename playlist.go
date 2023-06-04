@@ -1,7 +1,6 @@
 package nixplay
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
@@ -70,7 +69,7 @@ func (p *playlist) Delete(ctx context.Context) (err error) {
 	defer errorx.WrapWithFuncNameIfError(&err)
 
 	url := fmt.Sprintf("https://api.nixplay.com/v3/playlists/%d", p.nixplayID)
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodDelete, url, bytes.NewReader([]byte{}))
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodDelete, url, http.NoBody)
 	if err != nil {
 		return err
 	}
@@ -88,7 +87,7 @@ func (p *playlist) Delete(ctx context.Context) (err error) {
 }
 
 func (p *playlist) Photos(ctx context.Context) (retPhotos []Photo, err error) {
-	defer errorx.WrapWithFuncNameIfError(&err) //xxx ohh I think a lot of these need defers
+	defer errorx.WrapWithFuncNameIfError(&err)
 	return p.photoCache.All(ctx)
 }
 
@@ -102,15 +101,11 @@ func (p *playlist) PhotoWithID(ctx context.Context, id types.ID) (retPhoto Photo
 	return p.photoCache.PhotoWithID(ctx, id)
 }
 
-// xxx I think we can leave the size an offset off to just get all the photos in
-// one page. This simplifies things a lot. before you make this change confirm
-// it will work by adding a test that adds 1000 photos (this is more than
-// default size for either album or playlist)
 func (p *playlist) playlistPhotosPage(ctx context.Context, page uint64) ([]Photo, error) {
 	limit := uint64(photoPageSize) //same limit used by nixplay.com when getting photos
 	offset := page * limit
 	url := fmt.Sprintf("https://api.nixplay.com/v3/playlists/%d/slides?size=%d&offset=%d", p.nixplayID, limit, offset)
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, bytes.NewReader([]byte{}))
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, err
 	}

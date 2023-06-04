@@ -1,7 +1,6 @@
 package nixplay
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
@@ -70,7 +69,7 @@ func (a *album) Delete(ctx context.Context) (err error) {
 	defer errorx.WrapWithFuncNameIfError(&err)
 
 	url := fmt.Sprintf("https://api.nixplay.com/album/%d/delete/json/", a.nixplayID)
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, bytes.NewReader([]byte{}))
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, http.NoBody)
 	if err != nil {
 		return err
 	}
@@ -79,7 +78,7 @@ func (a *album) Delete(ctx context.Context) (err error) {
 		return err
 	}
 	defer resp.Body.Close()
-	defer io.Copy(io.Discard, resp.Body) //xxx track down any places where I may not be reading the response
+	defer io.Copy(io.Discard, resp.Body)
 
 	return httpx.StatusError(resp)
 }
@@ -99,17 +98,12 @@ func (a *album) PhotoWithID(ctx context.Context, id types.ID) (retPhoto Photo, e
 	return a.photoCache.PhotoWithID(ctx, id)
 }
 
-// xxx I think we can leave the size an offset off to just get all the photos in
-// one page. This simplifies things a lot. before you make this change confirm
-// it will work by adding a test that adds 1000 photos (this is more than
-// default size for either album or playlist)
 func (a *album) albumPhotosPage(ctx context.Context, page uint64) ([]Photo, error) {
 	page++ // nixplay uses 1 based indexing for album pages but photoCache assumes 0 based.
 
-	//xxx test multiple pages somehow
 	limit := photoPageSize //same limit used by nixplay.com when getting photos
 	url := fmt.Sprintf("https://api.nixplay.com/album/%d/pictures/json/?page=%d&limit=%d", a.nixplayID, page, limit)
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, bytes.NewReader([]byte{}))
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
