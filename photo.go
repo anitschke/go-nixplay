@@ -12,6 +12,7 @@ import (
 	"strconv"
 
 	"github.com/anitschke/go-nixplay/httpx"
+	"github.com/anitschke/go-nixplay/internal/cache"
 	"github.com/anitschke/go-nixplay/internal/errorx"
 	"github.com/anitschke/go-nixplay/types"
 )
@@ -57,6 +58,8 @@ type photo struct {
 	nixplayID uint64 //xxx doc should be zero if unknown
 	size      int64
 	url       string
+
+	elementDeletedListener []cache.ElementDeletedListener
 }
 
 func newPhoto(container Container, client httpx.Client, name string, md5Hash *types.MD5Hash, nixplayID uint64, size int64, url string) (retPhoto *photo, err error) {
@@ -260,7 +263,17 @@ func (p *photo) Delete(ctx context.Context) (err error) {
 		return err
 	}
 
-	return p.container.onPhotoDelete(ctx, p)
+	for _, l := range p.elementDeletedListener {
+		if err := l.ElementDeleted(ctx, p); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (p *photo) AddDeletedListener(l cache.ElementDeletedListener) {
+	p.elementDeletedListener = append(p.elementDeletedListener, l)
 }
 
 func (p *photo) getNixplayID(ctx context.Context) (uint64, error) {

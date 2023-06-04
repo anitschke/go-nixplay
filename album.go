@@ -139,7 +139,3 @@ func (a *album) AddPhoto(ctx context.Context, name string, r io.Reader, opts Add
 func (a *album) ResetCache() {
 	a.photoCache.Reset()
 }
-
-func (a *album) onPhotoDelete(ctx context.Context, photo Photo) error {
-	return a.photoCache.Remove(ctx, photo)
-}

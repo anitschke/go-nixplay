@@ -99,9 +99,6 @@ type Container interface {
 
 	// xxx doc May be called to reset the Containers internal cache of photos
 	ResetCache()
-
-	//xxx clean this up, needed to remove the photo from the container's cache, but it shouldn't belong on this interface
-	onPhotoDelete(ctx context.Context, p Photo) error
 }
 
 // xxx doc

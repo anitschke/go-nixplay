@@ -142,7 +142,3 @@ func (p *playlist) AddPhoto(ctx context.Context, name string, r io.Reader, opts 
 func (p *playlist) ResetCache() {
 	p.photoCache.Reset()
 }
-
-func (p *playlist) onPhotoDelete(ctx context.Context, photo Photo) error {
-	return p.photoCache.Remove(ctx, photo)
-}

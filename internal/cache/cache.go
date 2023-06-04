@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/anitschke/go-nixplay/types"
@@ -10,6 +11,15 @@ import (
 type Element interface {
 	ID() types.ID
 	Name(ctx context.Context) (string, error)
+}
+
+type ListenableElement interface {
+	Element
+	AddDeletedListener(l ElementDeletedListener)
+}
+
+type ElementDeletedListener interface {
+	ElementDeleted(ctx context.Context, e Element) error
 }
 
 // elementPageFunc is a function that when provided a page number can provide
@@ -141,6 +151,26 @@ func (c *Cache[T]) addElementUnsafe(p T) {
 	c.idToElement[id] = p
 
 	c.nameToElements = nil
+
+	// To aid in not having to transform big slices of interfaces around the
+	// types we store the same interface that we will expose to the eventual API
+	// at the end. But I don't want to expose the AddDeletedListener to the
+	// external API because it is implementation details so that method is not
+	// on the Element interface.
+	//
+	// So the underlying type that implements the T interface must also
+	// implement the ListenableElement interface so the cache can remove the
+	// element when it is destroyed.
+	//
+	// There is probably a better way to enforce this somehow at compile time
+	// but I think we have sufficient enough testing that this is ok.
+	le, ok := any(p).(ListenableElement)
+	if !ok {
+		// Ok to panic instead of error here since this is a programming error
+		// that should never be able to happen in prod given testing we have.
+		panic(fmt.Sprintf("%T must implement ListenableElement", p))
+	}
+	le.AddDeletedListener(c)
 }
 
 func (pc *Cache[T]) populateNameMapUnsafe(ctx context.Context) (err error) {
@@ -163,6 +193,15 @@ func (pc *Cache[T]) populateNameMapUnsafe(ctx context.Context) (err error) {
 		pc.nameToElements[name] = append(pc.nameToElements[name], p)
 	}
 	return nil
+}
+
+func (c *Cache[T]) ElementDeleted(ctx context.Context, e Element) (err error) {
+	et, ok := e.(T)
+	if !ok {
+		return fmt.Errorf("failed to cast element on delete")
+	}
+
+	return c.Remove(ctx, et)
 }
 
 func (c *Cache[T]) Remove(ctx context.Context, e T) (err error) {
