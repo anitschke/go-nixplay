@@ -12,6 +12,7 @@ import (
 
 	"github.com/anitschke/go-nixplay/httpx"
 	"github.com/anitschke/go-nixplay/internal/cache"
+	"github.com/anitschke/go-nixplay/internal/errorx"
 	"github.com/anitschke/go-nixplay/types"
 )
 
@@ -60,16 +61,13 @@ func (a *album) ID() types.ID {
 	return a.id
 }
 
-func (a *album) PhotoCount(ctx context.Context) (int64, error) {
+func (a *album) PhotoCount(ctx context.Context) (retCount int64, err error) {
+	defer errorx.WrapWithFuncNameIfError(&err)
 	return a.photoCount, nil
 }
 
 func (a *album) Delete(ctx context.Context) (err error) {
-	defer func() {
-		if err != nil {
-			err = fmt.Errorf("failed to delete album: %w", err)
-		}
-	}()
+	defer errorx.WrapWithFuncNameIfError(&err)
 
 	url := fmt.Sprintf("https://api.nixplay.com/album/%d/delete/json/", a.nixplayID)
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, bytes.NewReader([]byte{}))
@@ -87,20 +85,17 @@ func (a *album) Delete(ctx context.Context) (err error) {
 }
 
 func (a *album) Photos(ctx context.Context) (retPhotos []Photo, err error) {
-	defer func() {
-		if err != nil {
-			err = fmt.Errorf("failed to get photos: %w", err)
-		}
-	}()
-
+	defer errorx.WrapWithFuncNameIfError(&err)
 	return a.photoCache.All(ctx)
 }
 
-func (a *album) PhotosWithName(ctx context.Context, name string) ([]Photo, error) {
+func (a *album) PhotosWithName(ctx context.Context, name string) (retPhoto []Photo, err error) {
+	defer errorx.WrapWithFuncNameIfError(&err)
 	return a.photoCache.PhotosWithName(ctx, name)
 }
 
-func (a *album) PhotoWithID(ctx context.Context, id types.ID) (Photo, error) {
+func (a *album) PhotoWithID(ctx context.Context, id types.ID) (retPhoto Photo, err error) {
+	defer errorx.WrapWithFuncNameIfError(&err)
 	return a.photoCache.PhotoWithID(ctx, id)
 }
 
@@ -127,7 +122,9 @@ func (a *album) albumPhotosPage(ctx context.Context, page uint64) ([]Photo, erro
 	return albumPhotos.ToPhotos(a, a.client)
 }
 
-func (a *album) AddPhoto(ctx context.Context, name string, r io.Reader, opts AddPhotoOptions) (Photo, error) {
+func (a *album) AddPhoto(ctx context.Context, name string, r io.Reader, opts AddPhotoOptions) (retPhoto Photo, err error) {
+	defer errorx.WrapWithFuncNameIfError(&err)
+
 	albumID := uploadContainerID{
 		idName: "albumId",
 		id:     strconv.FormatUint(a.nixplayID, 10),

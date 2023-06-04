@@ -13,6 +13,7 @@ import (
 	"strconv"
 
 	"github.com/anitschke/go-nixplay/httpx"
+	"github.com/anitschke/go-nixplay/internal/errorx"
 	"github.com/anitschke/go-nixplay/types"
 )
 
@@ -59,7 +60,9 @@ type photo struct {
 	url       string
 }
 
-func newPhoto(container Container, client httpx.Client, name string, md5Hash *types.MD5Hash, nixplayID uint64, size int64, url string) (*photo, error) {
+func newPhoto(container Container, client httpx.Client, name string, md5Hash *types.MD5Hash, nixplayID uint64, size int64, url string) (retPhoto *photo, err error) {
+	defer errorx.WrapWithFuncNameIfError(&err)
+
 	// Based on current usage of newPhoto the MD5 hash should always be able to
 	// be provided, either because we are uploading a photo so we can do the
 	// hash ourselves, or because we are getting a list of photos and can
@@ -132,11 +135,7 @@ func newPhoto(container Container, client httpx.Client, name string, md5Hash *ty
 var _ = (Photo)((*photo)(nil))
 
 func md5HashFromPhotoURL(photoURL string) (returnHash types.MD5Hash, err error) {
-	defer func() {
-		if err != nil {
-			err = fmt.Errorf("failed to parse playlist photo URL for MD5 hash %q: %w", photoURL, err)
-		}
-	}()
+	defer errorx.WrapIfError(fmt.Sprintf("failed to parse playlist photo URL for MD5 hash %q", photoURL), &err)
 
 	urlObj, err := url.Parse(photoURL)
 	if err != nil {
@@ -159,7 +158,7 @@ func md5HashFromPhotoURL(photoURL string) (returnHash types.MD5Hash, err error) 
 func (p *photo) Name(ctx context.Context) (string, error) {
 	if p.name == "" {
 		if err := p.populatePhotoDataFromPictureEndpoint(ctx); err != nil {
-			return "", err
+			return "", fmt.Errorf("failed to get image name: %w", err)
 		}
 	}
 	if p.name == "" {
@@ -204,11 +203,7 @@ func (p *photo) URL(ctx context.Context) (string, error) {
 }
 
 func (p *photo) Open(ctx context.Context) (retReadCloser io.ReadCloser, err error) {
-	defer func() {
-		if err != nil {
-			err = fmt.Errorf("failed to open photo: %w", err)
-		}
-	}()
+	defer errorx.WrapWithFuncNameIfError(&err)
 
 	photoURL, err := p.URL(ctx)
 	if err != nil {
@@ -243,11 +238,7 @@ func (p *photo) Open(ctx context.Context) (retReadCloser io.ReadCloser, err erro
 }
 
 func (p *photo) Delete(ctx context.Context) (err error) {
-	defer func() {
-		if err != nil {
-			err = fmt.Errorf("failed to delete photo: %w", err)
-		}
-	}()
+	defer errorx.WrapWithFuncNameIfError(&err)
 
 	nixplayID, err := p.getNixplayID(ctx)
 	if err != nil {
@@ -285,7 +276,9 @@ func (p *photo) getNixplayID(ctx context.Context) (uint64, error) {
 	return p.nixplayID, nil
 }
 
-func (p *photo) populatePhotoDataFromListSearch(ctx context.Context) error {
+func (p *photo) populatePhotoDataFromListSearch(ctx context.Context) (err error) {
+	defer errorx.WrapWithFuncNameIfError(&err)
+
 	// Unfortunately when we add a new photo there doesn't seem to be any API to
 	// get nixplay's ID or URL for the photo. So what we need to do is query the
 	// parent album for all it's photos and then search for this photo by
@@ -345,7 +338,9 @@ func (p *photo) attemptPopulatePhotoDataFromListSearch(ctx context.Context) (boo
 	return false, nil
 }
 
-func (p *photo) populatePhotoDataFromPictureEndpoint(ctx context.Context) error {
+func (p *photo) populatePhotoDataFromPictureEndpoint(ctx context.Context) (err error) {
+	defer errorx.WrapWithFuncNameIfError(&err)
+
 	id, err := p.getNixplayID(ctx)
 	if err != nil {
 		return err
@@ -371,7 +366,7 @@ func (p *photo) populatePhotoDataFromPictureEndpoint(ctx context.Context) error 
 	return err
 }
 
-func (p *photo) populatePhotoDataFromHead(ctx context.Context) error {
+func (p *photo) populatePhotoDataFromHead(ctx context.Context) (err error) {
 	// xxx doc Getting the size of the photo is a little tricky. Ideally we could
 	// use the HEAD method but the way s3 Signature works is it is for a
 	// specific method. xxx add rest of details
@@ -382,6 +377,8 @@ func (p *photo) populatePhotoDataFromHead(ctx context.Context) error {
 	// the moment it does so I think we can just assume it will continue to do
 	// so and not complicate the code more by trying to make it handle future
 	// fringe cases where s3 doesn't do what we are expecting.
+
+	defer errorx.WrapWithFuncNameIfError(&err)
 
 	photoURL, err := p.URL(ctx)
 	if err != nil {

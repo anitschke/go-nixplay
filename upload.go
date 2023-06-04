@@ -15,6 +15,7 @@ import (
 	"strconv"
 
 	"github.com/anitschke/go-nixplay/httpx"
+	"github.com/anitschke/go-nixplay/internal/errorx"
 	"github.com/anitschke/go-nixplay/types"
 )
 
@@ -30,11 +31,7 @@ type uploadedPhoto struct {
 }
 
 func addPhoto(ctx context.Context, client httpx.Client, containerID uploadContainerID, name string, r io.Reader, opts AddPhotoOptions) (retData uploadedPhoto, err error) {
-	defer func() {
-		if err != nil {
-			err = fmt.Errorf("failed to add photo: %w", err)
-		}
-	}()
+	defer errorx.WrapWithFuncNameIfError(&err)
 
 	photoData, r, err := getUploadPhotoData(name, r, opts)
 	if err != nil {
@@ -81,7 +78,9 @@ type uploadPhotoData struct {
 	Name string
 }
 
-func getUploadPhotoData(name string, r io.Reader, opts AddPhotoOptions) (uploadPhotoData, io.Reader, error) {
+func getUploadPhotoData(name string, r io.Reader, opts AddPhotoOptions) (retData uploadPhotoData, retR io.Reader, err error) {
+	defer errorx.WrapWithFuncNameIfError(&err)
+
 	data := uploadPhotoData{
 		AddPhotoOptions: opts,
 		Name:            name,
@@ -128,11 +127,7 @@ func getUploadPhotoData(name string, r io.Reader, opts AddPhotoOptions) (uploadP
 }
 
 func getUploadToken(ctx context.Context, client httpx.Client, containerID uploadContainerID) (returnedToken string, err error) {
-	defer func() {
-		if err != nil {
-			err = fmt.Errorf("error getting upload token: %w", err)
-		}
-	}()
+	defer errorx.WrapWithFuncNameIfError(&err)
 
 	form := url.Values{
 		containerID.idName: {containerID.id},
@@ -153,11 +148,7 @@ func getUploadToken(ctx context.Context, client httpx.Client, containerID upload
 }
 
 func uploadNixplay(ctx context.Context, client httpx.Client, containerID uploadContainerID, photo uploadPhotoData, token string) (returnedResponse uploadNixplayResponse, err error) {
-	defer func() {
-		if err != nil {
-			err = fmt.Errorf("error uploading to nixplay: %w", err)
-		}
-	}()
+	defer errorx.WrapWithFuncNameIfError(&err)
 
 	form := url.Values{
 		containerID.idName: {containerID.id},
@@ -181,11 +172,7 @@ func uploadNixplay(ctx context.Context, client httpx.Client, containerID uploadC
 }
 
 func uploadS3(ctx context.Context, client httpx.Client, u uploadNixplayResponse, filename string, r io.Reader) (err error) {
-	defer func() {
-		if err != nil {
-			err = fmt.Errorf("error uploading to s3 bucket: %w", err)
-		}
-	}()
+	defer errorx.WrapWithFuncNameIfError(&err)
 
 	reqBody := &bytes.Buffer{}
 	writer := multipart.NewWriter(reqBody)
@@ -239,11 +226,7 @@ func uploadS3(ctx context.Context, client httpx.Client, u uploadNixplayResponse,
 }
 
 func monitorUpload(ctx context.Context, client httpx.Client, monitorID string) (err error) {
-	defer func() { //xxx do this sort of thing in more places
-		if err != nil {
-			err = fmt.Errorf("error monitoring upload: %w", err)
-		}
-	}()
+	defer errorx.WrapWithFuncNameIfError(&err)
 
 	url := fmt.Sprintf("https://upload-monitor.nixplay.com/status?id=%s", monitorID)
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, bytes.NewReader([]byte{}))

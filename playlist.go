@@ -12,6 +12,7 @@ import (
 
 	"github.com/anitschke/go-nixplay/httpx"
 	"github.com/anitschke/go-nixplay/internal/cache"
+	"github.com/anitschke/go-nixplay/internal/errorx"
 	"github.com/anitschke/go-nixplay/types"
 )
 
@@ -66,11 +67,7 @@ func (p *playlist) PhotoCount(ctx context.Context) (int64, error) {
 }
 
 func (p *playlist) Delete(ctx context.Context) (err error) {
-	defer func() {
-		if err != nil {
-			err = fmt.Errorf("failed to delete album: %w", err)
-		}
-	}()
+	defer errorx.WrapWithFuncNameIfError(&err)
 
 	url := fmt.Sprintf("https://api.nixplay.com/v3/playlists/%d", p.nixplayID)
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodDelete, url, bytes.NewReader([]byte{}))
@@ -91,21 +88,17 @@ func (p *playlist) Delete(ctx context.Context) (err error) {
 }
 
 func (p *playlist) Photos(ctx context.Context) (retPhotos []Photo, err error) {
-	defer func() {
-		//xxx could I wrap this into a helper so it is just one line everywhere
-		if err != nil {
-			err = fmt.Errorf("failed to get playlist photos: %w", err)
-		}
-	}()
-
+	defer errorx.WrapWithFuncNameIfError(&err) //xxx ohh I think a lot of these need defers
 	return p.photoCache.All(ctx)
 }
 
-func (p *playlist) PhotosWithName(ctx context.Context, name string) ([]Photo, error) {
+func (p *playlist) PhotosWithName(ctx context.Context, name string) (retPhotos []Photo, err error) {
+	defer errorx.WrapWithFuncNameIfError(&err)
 	return p.photoCache.PhotosWithName(ctx, name)
 }
 
-func (p *playlist) PhotoWithID(ctx context.Context, id types.ID) (Photo, error) {
+func (p *playlist) PhotoWithID(ctx context.Context, id types.ID) (retPhoto Photo, err error) {
+	defer errorx.WrapWithFuncNameIfError(&err)
 	return p.photoCache.PhotoWithID(ctx, id)
 }
 
@@ -130,7 +123,9 @@ func (p *playlist) playlistPhotosPage(ctx context.Context, page uint64) ([]Photo
 	return playlistPhotos.ToPhotos(p, p.client)
 }
 
-func (p *playlist) AddPhoto(ctx context.Context, name string, r io.Reader, opts AddPhotoOptions) (Photo, error) {
+func (p *playlist) AddPhoto(ctx context.Context, name string, r io.Reader, opts AddPhotoOptions) (retPhoto Photo, err error) {
+	defer errorx.WrapWithFuncNameIfError(&err)
+
 	albumID := uploadContainerID{
 		idName: "playlistId",
 		id:     strconv.FormatUint(p.nixplayID, 10),

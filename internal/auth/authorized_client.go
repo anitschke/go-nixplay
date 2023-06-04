@@ -89,7 +89,7 @@ var _ = (httpx.Client)((*AuthorizedClient)(nil))
 func NewAuthorizedClient(ctx context.Context, client httpx.Client, authIn Authorization) (*AuthorizedClient, error) {
 	auth, err := doAuth(ctx, client, authIn)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create authorized http client: %w", err)
 	}
 	return &AuthorizedClient{
 		client: client,
