@@ -70,6 +70,8 @@ type AddPhotoOptions struct {
 // lets just error out for now if someone tries to use global for deleting a
 // photo from an album.
 
+//xxx no guarantee that IDs will remain the same for same objects in the future
+
 // xxx doc
 type Client interface {
 	Containers(ctx context.Context, containerType types.ContainerType) ([]Container, error)

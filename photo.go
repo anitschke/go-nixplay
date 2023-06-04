@@ -45,6 +45,8 @@ var md5HashFromPhotoURLPath = regexp.MustCompile(`^/\d+/\d+_([A-Fa-f0-9]{32})`)
 // the same. So photo does most of the heavy lifting and then makes a call out
 // to photoImplementation when it needs implementation specific info regarding
 // album/playlist photos.
+//
+// xxx doc photoImplementation doesn't exist anymore
 type photo struct {
 	name    string
 	id      types.ID
