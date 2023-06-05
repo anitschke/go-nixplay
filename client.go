@@ -17,10 +17,13 @@ type AddPhotoOptions struct {
 	// extension, if it can not be inferred from extension of file it will throw
 	// a documented error.
 	//
-	// xxx doc this will use go standard library mime.TypeByExtension, but this is
+	// xxx this will use go standard library mime.TypeByExtension, but this is
 	// pretty limited in terms of list of extensions supported so we should use
 	// mime.AddExtensionType to add in all the image video mime types we can
 	// find. OR at least all the ones nixplay supports.
+	//
+	// xxx look into what happens if you try to upload a file time that nixplay
+	// doesn't support.
 	MIMEType string
 
 	//xxx doc optional, if not specified it will be computed from reader
@@ -70,7 +73,7 @@ type AddPhotoOptions struct {
 // lets just error out for now if someone tries to use global for deleting a
 // photo from an album.
 
-//xxx no guarantee that IDs will remain the same for same objects in the future
+//xxx doc no guarantee that IDs will remain the same for same objects in the future
 
 // xxx doc
 type Client interface {
