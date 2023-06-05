@@ -7,7 +7,6 @@ import (
 	"image/jpeg"
 	"io"
 	"math/rand"
-	"os"
 	"regexp"
 	"strconv"
 	"testing"
