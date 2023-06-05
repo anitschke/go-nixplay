@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 
+	_ "github.com/anitschke/go-nixplay/internal/mime"
 	"github.com/anitschke/go-nixplay/types"
 )
 
@@ -17,13 +18,12 @@ type AddPhotoOptions struct {
 	// extension, if it can not be inferred from extension of file it will throw
 	// a documented error.
 	//
-	// xxx this will use go standard library mime.TypeByExtension, but this is
-	// pretty limited in terms of list of extensions supported so we should use
-	// mime.AddExtensionType to add in all the image video mime types we can
-	// find. OR at least all the ones nixplay supports.
+	// According to Nixplay documentation  JPEG, PNG, TIFF, HEIC, MP4 are all
+	// supported see the following for more details:
+	// https://web.archive.org/web/20230328184513/https://support.nixplay.com/hc/en-us/articles/900002393886-What-photo-and-video-formats-does-Nixplay-support-
 	//
-	// xxx look into what happens if you try to upload a file time that nixplay
-	// doesn't support.
+	// If you try to upload an unsupported file type you will get a 400 Bad
+	// Request error from the server.
 	MIMEType string
 
 	//xxx doc optional, if not specified it will be computed from reader

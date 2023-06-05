@@ -7,6 +7,7 @@ import (
 	"image/jpeg"
 	"io"
 	"math/rand"
+	"os"
 	"regexp"
 	"strconv"
 	"testing"
@@ -495,4 +496,25 @@ func TestDefaultClient_Photos(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDefaultClient_UploadUnsupportedFileType(t *testing.T) {
+
+	ctx := context.Background()
+	client := testClient()
+
+	// create temporary container for testing
+	container := tempContainer(t, client, types.AlbumContainerType)
+
+	//////////////////////////
+	// Add
+	//////////////////////////
+	f, err := os.Open("/home/anitschk/Downloads/test.txt")
+	require.NoError(t, err)
+	defer func() {
+		assert.NoError(t, f.Close())
+	}()
+
+	_, err = container.AddPhoto(ctx, "test.txt", f, AddPhotoOptions{})
+	require.NoError(t, err)
 }

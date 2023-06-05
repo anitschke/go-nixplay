@@ -2,3 +2,5 @@ xxx remove this file
 xxx add notice that this is largely based on work from https://github.com/andrewjjenkins/picsync
 xxx reach out to https://github.com/andrewjjenkins about if I added notice / acknowledgment to his liking
 xxx add testing with real account via https://docs.github.com/en/actions/security-guides/encrypted-secrets
+
+xxx try this out with nixplaysignage.com
