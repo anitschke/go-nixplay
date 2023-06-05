@@ -2,7 +2,6 @@ package httpx
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 )
@@ -15,11 +14,6 @@ func DoUnmarshalJSONResponse(client Client, request *http.Request, response any)
 	defer resp.Body.Close()
 
 	if err := StatusError(resp); err != nil {
-		//xxx
-		b, _ := io.ReadAll(resp.Body)
-		fmt.Println(string(b))
-
-		// io.Copy(io.Discard, resp.Body) //xxx
 		return err
 	}
 
