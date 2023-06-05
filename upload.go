@@ -240,8 +240,14 @@ func monitorUpload(ctx context.Context, client httpx.Client, monitorID string) (
 	defer io.Copy(io.Discard, resp.Body)
 
 	// xxx it seems like there is a bug in here where if you try to upload the
-	// same photo into two playlists then it errors out with a 400 saying the
-	// photo already exists. Need to look into this.
+	// same photo into two playlists then it errors out with a 400 with body we
+	// get is "image-exists"
+	//
+	// So what I need to do is check for this and if it happens return a special
+	// errDuplicateImage. Then higher up where we are doing the upload from the
+	// container we can watch for this error. For albums we just throw the error
+	// along, but for playlists when we see this error we can ignore it because
+	// it is a duplicate in the album and will still be added to the playlist.
 
 	return httpx.StatusError(resp)
 }

@@ -4,3 +4,8 @@ xxx reach out to https://github.com/andrewjjenkins about if I added notice / ack
 xxx add testing with real account via https://docs.github.com/en/actions/security-guides/encrypted-secrets
 
 xxx try this out with nixplaysignage.com
+
+xxx 	// There will also be a bug where if you delete a photo that is in two
+	// playlists it will get deleted in both playlists. Need revert delete of
+	// photos from playlists to do it the old way. (but probably make it simple and just
+	// remove it from that playlist and not from the "My Uploads")

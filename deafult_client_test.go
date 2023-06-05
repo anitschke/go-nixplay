@@ -224,6 +224,10 @@ func TestDefaultClient_Containers(t *testing.T) {
 			assert.Equal(t, name, newName)
 			assert.Equal(t, newContainer.ContainerType(), tc.containerType)
 
+			photoCount, err := newContainer.PhotoCount(ctx)
+			assert.NoError(t, err)
+			assert.Equal(t, photoCount, int64(0))
+
 			newContainerD, err := newContainerData(newContainer)
 			assert.NoError(t, err)
 
@@ -340,7 +344,7 @@ func TestDefaultClient_Photos(t *testing.T) {
 			addedPhotos := make([]Photo, 0, len(allTestPhotos))
 			photoNames := make([]string, 0, len(allTestPhotos))
 			photoIDs := make([]types.ID, 0, len(allTestPhotos))
-			for _, tp := range allTestPhotos {
+			for i, tp := range allTestPhotos {
 				file, err := tp.Open()
 				require.NoError(t, err)
 				defer file.Close()
@@ -366,6 +370,10 @@ func TestDefaultClient_Photos(t *testing.T) {
 
 				assert.Equal(t, actSize, tp.Size)
 				assert.Equal(t, actMD5, md5Hash)
+
+				photoCount, err := container.PhotoCount(ctx)
+				assert.NoError(t, err)
+				assert.Equal(t, photoCount, int64(i+1))
 
 				addedPhotos = append(addedPhotos, p)
 				photoNames = append(photoNames, tp.Name)
@@ -394,6 +402,10 @@ func TestDefaultClient_Photos(t *testing.T) {
 			assert.NoError(t, err)
 			assert.ElementsMatch(t, photosData, addedPhotoData)
 
+			photoCount, err := container.PhotoCount(ctx)
+			assert.NoError(t, err)
+			assert.Equal(t, photoCount, int64(len(addedPhotos)))
+
 			//////////////////////////
 			// Reset Cache And List
 			//////////////////////////
@@ -405,6 +417,10 @@ func TestDefaultClient_Photos(t *testing.T) {
 			photosData, err = photoDataSlice(photos)
 			assert.NoError(t, err)
 			assert.ElementsMatch(t, photosData, addedPhotoData)
+
+			photoCount, err = container.PhotoCount(ctx)
+			assert.NoError(t, err)
+			assert.Equal(t, photoCount, int64(len(addedPhotos)))
 
 			//////////////////////////
 			// Get Photo By ID
@@ -486,6 +502,10 @@ func TestDefaultClient_Photos(t *testing.T) {
 				photosData, err = photoDataSlice(photos)
 				assert.NoError(t, err)
 				assert.ElementsMatch(t, photosData, expPhotoData)
+
+				photoCount, err := container.PhotoCount(ctx)
+				assert.NoError(t, err)
+				assert.Equal(t, photoCount, int64(len(addedPhotos)-i-1))
 			}
 
 			//////////////////////////
@@ -494,6 +514,10 @@ func TestDefaultClient_Photos(t *testing.T) {
 			photos, err = container.Photos(ctx)
 			assert.NoError(t, err)
 			assert.Empty(t, photos)
+
+			photoCount, err = container.PhotoCount(ctx)
+			assert.NoError(t, err)
+			assert.Equal(t, photoCount, int64(0))
 
 			//////////////////////////
 			// Get Photo By ID
@@ -512,6 +536,118 @@ func TestDefaultClient_Photos(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Empty(t, photosWithName)
 			}
+		})
+	}
+}
+
+func TestDefaultClient_SamePhotoInTwoContainers(t *testing.T) {
+	// This test exists because I have had some issues with trying to upload the
+	// same image into two different playlists, I think because under the hood
+	// they are uploaded into the same "My Uploads" album and nixplay doesn't
+	// allow multiple photos with the same content to exist in the same album.
+
+	type testData struct {
+		containerType types.ContainerType
+	}
+
+	tests := []testData{
+		{
+			containerType: types.AlbumContainerType,
+		},
+		{
+			containerType: types.PlaylistContainerType,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(string(tc.containerType), func(t *testing.T) {
+			ctx := context.Background()
+			client := testClient()
+
+			// create temporary container1 for testing
+			container1 := tempContainer(t, client, tc.containerType)
+			container2 := tempContainer(t, client, tc.containerType)
+			allTestPhotos, err := photos.AllPhotos()
+			require.NoError(t, err)
+			photoToUpload := allTestPhotos[0]
+
+			//////////////////////////
+			// Add To First Container
+			//////////////////////////
+			p1 := func() Photo {
+				file, err := photoToUpload.Open()
+				require.NoError(t, err)
+				defer file.Close()
+				p, err := container1.AddPhoto(ctx, photoToUpload.Name, file, AddPhotoOptions{})
+				require.NoError(t, err)
+				return p
+			}()
+
+			//////////////////////////
+			// Add To Second Container
+			//////////////////////////
+			p2 := func() Photo {
+				file, err := photoToUpload.Open()
+				require.NoError(t, err)
+				defer file.Close()
+				p, err := container2.AddPhoto(ctx, photoToUpload.Name, file, AddPhotoOptions{})
+				require.NoError(t, err)
+				return p
+			}()
+
+			//////////////////////////
+			// Validate ID uniqueness
+			//////////////////////////
+			assert.NotEqual(t, p1.ID(), p2.ID())
+
+			//////////////////////////
+			// Download Photo in First Container
+			//////////////////////////
+			var localPhotoBytes bytes.Buffer
+			func() {
+				r, err := photoToUpload.Open()
+				require.NoError(t, err)
+				defer func() {
+					err := r.Close()
+					assert.NoError(t, err)
+				}()
+				bytesCopied, err := io.Copy(&localPhotoBytes, r)
+				require.NoError(t, err)
+				assert.Equal(t, bytesCopied, photoToUpload.Size)
+			}()
+
+			verifyDownload := func(p Photo) {
+				var downloadedPhotoBytes bytes.Buffer
+				r, err := p.Open(ctx)
+				require.NoError(t, err)
+				defer func() {
+					err := r.Close()
+					assert.NoError(t, err)
+				}()
+				bytesCopied, err := io.Copy(&downloadedPhotoBytes, r)
+				require.NoError(t, err)
+				assert.Equal(t, bytesCopied, photoToUpload.Size)
+
+				assert.Equal(t, downloadedPhotoBytes.Bytes(), localPhotoBytes.Bytes())
+			}
+			verifyDownload(p1)
+
+			//////////////////////////
+			// Download Photo in Second Container
+			//////////////////////////
+			verifyDownload(p2)
+
+			//////////////////////////
+			// Delete
+			//////////////////////////
+			//
+			// After we are done we need to delete the photos so they don't get
+			// stuck in the "My Uploads" album (in the case of testing
+			// playlists)
+			err = p1.Delete(ctx)
+			assert.NoError(t, err)
+			err = p2.Delete(ctx)
+			assert.NoError(t, err)
 		})
 	}
 }

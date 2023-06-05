@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"sync"
 
 	"github.com/anitschke/go-nixplay/httpx"
 	"github.com/anitschke/go-nixplay/internal/cache"
@@ -24,7 +25,10 @@ type container struct {
 	containerType types.ContainerType
 	name          string
 	id            types.ID
-	photoCount    int64 //xxx add test for photo count //xxx this changes as we add/remove photos
+
+	// photoCount can change over time so it must be guarded by a mutex
+	photoCountMu sync.Mutex
+	photoCount   int64
 
 	client    httpx.Client
 	nixplayID uint64
@@ -59,6 +63,7 @@ func newContainer(client httpx.Client, containerType types.ContainerType, name s
 	}
 
 	c.photoCache = cache.NewCache(c.photosPage)
+	c.photoCache.AddDeletedListener(c)
 
 	return c
 }
@@ -80,6 +85,17 @@ func (c *container) ID() types.ID {
 }
 
 func (c *container) PhotoCount(ctx context.Context) (retCount int64, err error) {
+	c.photoCountMu.Lock()
+	defer c.photoCountMu.Unlock()
+
+	if c.photoCount == -1 {
+		count, err := c.photoCache.ElementCount(ctx)
+		if err != nil {
+			return 0, err
+		}
+		c.photoCount = count
+	}
+
 	return c.photoCount, nil
 }
 
@@ -121,12 +137,12 @@ func (c *container) Photos(ctx context.Context) (retPhotos []Photo, err error) {
 
 func (c *container) PhotosWithName(ctx context.Context, name string) (retPhoto []Photo, err error) {
 	defer errorx.WrapWithFuncNameIfError(&err)
-	return c.photoCache.PhotosWithName(ctx, name)
+	return c.photoCache.ElementsWithName(ctx, name)
 }
 
 func (c *container) PhotoWithID(ctx context.Context, id types.ID) (retPhoto Photo, err error) {
 	defer errorx.WrapWithFuncNameIfError(&err)
-	return c.photoCache.PhotoWithID(ctx, id)
+	return c.photoCache.ElementWithID(ctx, id)
 }
 
 func (c *container) photosPage(ctx context.Context, page uint64) ([]Photo, error) {
@@ -154,7 +170,20 @@ func (c *container) AddPhoto(ctx context.Context, name string, r io.Reader, opts
 	}
 
 	c.photoCache.Add(p)
+
+	c.photoCountMu.Lock()
+	defer c.photoCountMu.Unlock()
+	c.photoCount++
+
 	return p, nil
+}
+
+// Listens to deletes of photos from the cache
+func (c *container) ElementDeleted(ctx context.Context, e cache.Element) (err error) {
+	c.photoCountMu.Lock()
+	defer c.photoCountMu.Unlock()
+	c.photoCount--
+	return nil
 }
 
 func (c *container) ResetCache() {

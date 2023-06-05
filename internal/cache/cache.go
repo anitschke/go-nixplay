@@ -39,6 +39,8 @@ type Cache[T Element] struct {
 	elements       []T
 	nameToElements map[string][]T
 	idToElement    map[types.ID]T
+
+	elementDeletedListener []ElementDeletedListener
 }
 
 func NewCache[T Element](elementPageFunc elementPageFunc[T]) *Cache[T] {
@@ -68,9 +70,21 @@ func (c *Cache[T]) All(ctx context.Context) ([]T, error) {
 	return elements, nil
 }
 
+// ElementCount will return the number of elements
+func (c *Cache[T]) ElementCount(ctx context.Context) (int64, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if err := c.loadAllUnsafe(ctx); err != nil {
+		return 0, err
+	}
+
+	return int64(len(c.elements)), nil
+}
+
 // get elements with a specific name. In the event that there are no elements with
 // the specified name nil is returned
-func (c *Cache[T]) PhotosWithName(ctx context.Context, name string) ([]T, error) {
+func (c *Cache[T]) ElementsWithName(ctx context.Context, name string) ([]T, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -90,7 +104,7 @@ func (c *Cache[T]) PhotosWithName(ctx context.Context, name string) ([]T, error)
 
 // get the element with the specified ID. In the event that there is no element
 // with the specified ID a nil Photo is returned
-func (c *Cache[T]) PhotoWithID(ctx context.Context, id types.ID) (T, error) {
+func (c *Cache[T]) ElementWithID(ctx context.Context, id types.ID) (T, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -201,7 +215,22 @@ func (c *Cache[T]) ElementDeleted(ctx context.Context, e Element) (err error) {
 		return fmt.Errorf("failed to cast element on delete")
 	}
 
+	if err := c.Remove(ctx, et); err != nil {
+		return err
+	}
+
+	// Forward on to anyone listening to deletes from the cache
+	for _, l := range c.elementDeletedListener {
+		if err := l.ElementDeleted(ctx, e); err != nil {
+			return err
+		}
+	}
+
 	return c.Remove(ctx, et)
+}
+
+func (c *Cache[T]) AddDeletedListener(l ElementDeletedListener) {
+	c.elementDeletedListener = append(c.elementDeletedListener, l)
 }
 
 func (c *Cache[T]) Remove(ctx context.Context, e T) (err error) {

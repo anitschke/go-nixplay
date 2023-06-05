@@ -120,6 +120,10 @@ func TestDefaultClient_Photos_Stress(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Len(t, photos, len(allTestPhotos))
 
+			photoCount, err := container.PhotoCount(ctx)
+			assert.NoError(t, err)
+			assert.Equal(t, photoCount, int64(stressTestPhotoCount))
+
 			//////////////////////////
 			// Validate ID uniqueness
 			//////////////////////////
@@ -177,6 +181,10 @@ func TestDefaultClient_Photos_Stress(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Empty(t, photos)
 
+			photoCount, err = container.PhotoCount(ctx)
+			assert.NoError(t, err)
+			assert.Equal(t, photoCount, int64(0))
+
 			//////////////////////////
 			// Clear Cache and List
 			//////////////////////////
@@ -184,6 +192,10 @@ func TestDefaultClient_Photos_Stress(t *testing.T) {
 			photos, err = container.Photos(ctx)
 			assert.NoError(t, err)
 			assert.Empty(t, photos)
+
+			photoCount, err = container.PhotoCount(ctx)
+			assert.NoError(t, err)
+			assert.Equal(t, photoCount, int64(0))
 		})
 	}
 }

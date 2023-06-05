@@ -122,23 +122,31 @@ func (c *DefaultClient) playlists(ctx context.Context) ([]Container, error) {
 }
 
 func (c *DefaultClient) Container(ctx context.Context, containerType types.ContainerType, name string) (Container, error) {
-	//xxx add caching of containers
+	var cache *cache.Cache[Container]
+	switch containerType {
+	case types.AlbumContainerType:
+		cache = c.albumCache
+	case types.PlaylistContainerType:
+		cache = c.playlistCache
+	default:
+		return nil, types.ErrInvalidContainerType
+	}
 
-	containers, err := c.Containers(ctx, containerType)
+	containers, err := cache.ElementsWithName(ctx, name)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, c := range containers {
-		cName, err := c.Name(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if cName == name {
-			return c, nil
-		}
+	// I did some checking and Nixplay doesn't support having multiple
+	// containers with the same name so we will error out if there are more than
+	// one container. If somehow this IS possible then I need to update this
+	// API.
+	if len(containers) > 1 {
+		return nil, errors.New("duplicate containers with the same name found")
 	}
-
+	if len(containers) == 1 {
+		return containers[0], nil
+	}
 	return nil, nil
 }
 
