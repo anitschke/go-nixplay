@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"regexp"
 	"strconv"
+	"sync"
 
 	"github.com/anitschke/go-nixplay/httpx"
 	"github.com/anitschke/go-nixplay/internal/cache"
@@ -48,20 +49,23 @@ var md5HashFromPhotoURLPath = regexp.MustCompile(`^/\d+/\d+_([A-Fa-f0-9]{32})`)
 //
 // xxx doc photoImplementation doesn't exist anymore
 type photo struct {
-	name    string
 	id      types.ID
 	md5Hash types.MD5Hash
 
 	container Container
 	client    httpx.Client
 
-	//xxx needs mutex for things that can be updated
+	elementDeletedListener []cache.ElementDeletedListener
 
-	nixplayID uint64 //xxx doc should be zero if unknown
+	// All of the following data may not be known when the photo object is
+	// initially created and as a result may need to be looked up and cached
+	// when needed. As a result all of this data must be guarded by a mutex
+	// because it may change over time.
+	mu        sync.Mutex
+	name      string
+	nixplayID uint64
 	size      int64
 	url       string
-
-	elementDeletedListener []cache.ElementDeletedListener
 }
 
 func newPhoto(container Container, client httpx.Client, name string, md5Hash *types.MD5Hash, nixplayID uint64, size int64, url string) (retPhoto *photo, err error) {
@@ -160,6 +164,9 @@ func md5HashFromPhotoURL(photoURL string) (returnHash types.MD5Hash, err error) 
 }
 
 func (p *photo) Name(ctx context.Context) (string, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	if p.name == "" {
 		if err := p.populatePhotoDataFromPictureEndpoint(ctx); err != nil {
 			return "", fmt.Errorf("failed to get image name: %w", err)
@@ -195,6 +202,9 @@ func (p *photo) MD5Hash(ctx context.Context) (types.MD5Hash, error) {
 }
 
 func (p *photo) URL(ctx context.Context) (string, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	if p.url == "" {
 		if err := p.populatePhotoDataFromListSearch(ctx); err != nil {
 			return "", fmt.Errorf("failed to get image url: %w", err)
@@ -243,6 +253,9 @@ func (p *photo) Open(ctx context.Context) (retReadCloser io.ReadCloser, err erro
 
 func (p *photo) Delete(ctx context.Context) (err error) {
 	defer errorx.WrapWithFuncNameIfError(&err)
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
 	nixplayID, err := p.getNixplayID(ctx)
 	if err != nil {

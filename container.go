@@ -24,7 +24,7 @@ type container struct {
 	containerType types.ContainerType
 	name          string
 	id            types.ID
-	photoCount    int64 //xxx add test for photo count
+	photoCount    int64 //xxx add test for photo count //xxx this changes as we add/remove photos
 
 	client    httpx.Client
 	nixplayID uint64
