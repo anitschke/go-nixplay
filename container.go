@@ -29,7 +29,8 @@ type container struct {
 	client    httpx.Client
 	nixplayID uint64
 
-	photoCache *cache.Cache[Photo]
+	photoCache             *cache.Cache[Photo]
+	elementDeletedListener []cache.ElementDeletedListener
 
 	photoPageFunc     photoPageFunc
 	deleteRequestFunc deleteRequestFunc
@@ -96,7 +97,21 @@ func (c *container) Delete(ctx context.Context) (err error) {
 	defer resp.Body.Close()
 	defer io.Copy(io.Discard, resp.Body)
 
-	return httpx.StatusError(resp)
+	if err := httpx.StatusError(resp); err != nil {
+		return err
+	}
+
+	for _, l := range c.elementDeletedListener {
+		if err := l.ElementDeleted(ctx, c); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *container) AddDeletedListener(l cache.ElementDeletedListener) {
+	c.elementDeletedListener = append(c.elementDeletedListener, l)
 }
 
 func (c *container) Photos(ctx context.Context) (retPhotos []Photo, err error) {
@@ -134,8 +149,12 @@ func (c *container) AddPhoto(ctx context.Context, name string, r io.Reader, opts
 	nixplayPhotoID := uint64(0)
 	photoURL := ""
 	p, err := newPhoto(c, c.client, name, &photoData.md5Hash, nixplayPhotoID, photoData.size, photoURL)
+	if err != nil {
+		return nil, err
+	}
+
 	c.photoCache.Add(p)
-	return p, err
+	return p, nil
 }
 
 func (c *container) ResetCache() {

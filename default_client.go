@@ -11,6 +11,7 @@ import (
 
 	"github.com/anitschke/go-nixplay/httpx"
 	"github.com/anitschke/go-nixplay/internal/auth"
+	"github.com/anitschke/go-nixplay/internal/cache"
 	"github.com/anitschke/go-nixplay/types"
 )
 
@@ -22,6 +23,9 @@ type DefaultClientOptions struct {
 
 type DefaultClient struct {
 	client httpx.Client
+
+	albumCache    *cache.Cache[Container]
+	playlistCache *cache.Cache[Container]
 }
 
 var _ = (Client)((*DefaultClient)(nil))
@@ -36,20 +40,35 @@ func NewDefaultClient(ctx context.Context, a auth.Authorization, opts DefaultCli
 		return nil, fmt.Errorf("authorization failed: %w", err)
 	}
 
-	return &DefaultClient{
+	c := &DefaultClient{
 		client: client,
-	}, nil
+	}
+	c.albumCache = cache.NewCache(c.albumsPage)
+	c.playlistCache = cache.NewCache(c.playlistsPage)
+
+	return c, nil
 }
 
 func (c *DefaultClient) Containers(ctx context.Context, containerType types.ContainerType) ([]Container, error) {
 	switch containerType {
 	case types.AlbumContainerType:
-		return c.albums(ctx)
+		return c.albumCache.All(ctx)
 	case types.PlaylistContainerType:
-		return c.playlists(ctx)
+		return c.playlistCache.All(ctx)
 	default:
 		return nil, types.ErrInvalidContainerType
 	}
+}
+
+func (c *DefaultClient) albumsPage(ctx context.Context, page uint64) ([]Container, error) {
+	// the cache works on paginated data right now, but we can get all the data at
+	// once for containers so we just need to write a quick and dirty adaptor to return all the data
+	// in the first page any always return empty data for subsequent data.
+	if page == 0 {
+		return c.albums(ctx)
+	}
+	return nil, nil
+
 }
 
 func (c *DefaultClient) albums(ctx context.Context) ([]Container, error) {
@@ -75,6 +94,17 @@ func (c *DefaultClient) albumsFromURL(ctx context.Context, url string) ([]Contai
 		return nil, err
 	}
 	return albums.ToContainers(c.client), nil
+}
+
+func (c *DefaultClient) playlistsPage(ctx context.Context, page uint64) ([]Container, error) {
+	// the cache works on paginated data right now, but we can get all the data at
+	// once for containers so we just need to write a quick and dirty adaptor to return all the data
+	// in the first page any always return empty data for subsequent data.
+	if page == 0 {
+		return c.playlists(ctx)
+	}
+	return nil, nil
+
 }
 
 func (c *DefaultClient) playlists(ctx context.Context) ([]Container, error) {
@@ -140,7 +170,9 @@ func (c *DefaultClient) createAlbum(ctx context.Context, name string) (Container
 		return nil, errors.New("incorrect number of created containers returned")
 	}
 
-	return albums[0].ToContainer(c.client), nil
+	a := albums[0].ToContainer(c.client)
+	c.albumCache.Add(a)
+	return a, nil
 }
 
 func (c *DefaultClient) createPlaylist(ctx context.Context, name string) (Container, error) {
@@ -168,5 +200,12 @@ func (c *DefaultClient) createPlaylist(ctx context.Context, name string) (Contai
 	// just assume that nixplay honored the exact name we asked it to create. I
 	// think this should be reasonably safe.
 	nPhotos := int64(0)
-	return newPlaylist(c.client, name, createResponse.PlaylistId, nPhotos), nil
+	p := newPlaylist(c.client, name, createResponse.PlaylistId, nPhotos)
+	c.playlistCache.Add(p)
+	return p, nil
+}
+
+func (c *DefaultClient) ResetCache() {
+	c.albumCache.Reset()
+	c.playlistCache.Reset()
 }

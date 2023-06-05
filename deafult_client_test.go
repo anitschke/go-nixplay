@@ -280,6 +280,25 @@ func TestDefaultClient_Containers(t *testing.T) {
 			container, err = client.Container(ctx, tc.containerType, newName)
 			assert.NoError(t, err)
 			assert.Equal(t, container, nil)
+
+			//////////////////////////
+			// Reset Cache and List
+			//////////////////////////
+			client.ResetCache()
+			containers, err = client.Containers(ctx, tc.containerType)
+			assert.NoError(t, err)
+			assert.Len(t, containers, len(initialContainerNames))
+			names = getNamesAndCheckContainerType(containers)
+			assert.ElementsMatch(t, names, initialContainerNames)
+
+			//////////////////////////
+			// Reset Cache and Get
+			//////////////////////////
+			client.ResetCache()
+			container, err = client.Container(ctx, tc.containerType, newName)
+			assert.NoError(t, err)
+			assert.Equal(t, container, nil)
+
 		})
 	}
 }
