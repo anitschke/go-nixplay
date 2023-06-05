@@ -212,7 +212,7 @@ func TestDefaultClient_Containers(t *testing.T) {
 			//////////////////////////
 			newName := "MyNewContainer"
 			container, err := client.Container(ctx, tc.containerType, newName)
-			assert.ErrorIs(t, err, ErrContainerNotFound)
+			assert.NoError(t, err)
 			assert.Equal(t, container, nil)
 
 			//////////////////////////
@@ -279,7 +279,7 @@ func TestDefaultClient_Containers(t *testing.T) {
 			// Get
 			//////////////////////////
 			container, err = client.Container(ctx, tc.containerType, newName)
-			assert.ErrorIs(t, err, ErrContainerNotFound)
+			assert.NoError(t, err)
 			assert.Equal(t, container, nil)
 		})
 	}

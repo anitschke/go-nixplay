@@ -109,7 +109,7 @@ func (c *DefaultClient) Container(ctx context.Context, containerType types.Conta
 		}
 	}
 
-	return nil, ErrContainerNotFound
+	return nil, nil
 }
 
 func (c *DefaultClient) CreateContainer(ctx context.Context, containerType types.ContainerType, name string) (Container, error) {

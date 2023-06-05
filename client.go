@@ -2,15 +2,10 @@ package nixplay
 
 import (
 	"context"
-	"errors"
 	"io"
 
 	_ "github.com/anitschke/go-nixplay/internal/mime"
 	"github.com/anitschke/go-nixplay/types"
-)
-
-var (
-	ErrContainerNotFound = errors.New("could not find the specified container")
 )
 
 type AddPhotoOptions struct {
@@ -81,10 +76,7 @@ type Client interface {
 
 	// Container gets the specified container based on type and name.
 	//
-	// If the specified container could not be found then ErrContainerNotFound
-	// will be returned.
-	//
-	// xxx I don't need ErrContainerNotFound anymore since I can now just return a nil container
+	// If the specified container could not be found then a nil container will be returned
 	Container(ctx context.Context, containerType types.ContainerType, name string) (Container, error)
 
 	CreateContainer(ctx context.Context, containerType types.ContainerType, name string) (Container, error)
