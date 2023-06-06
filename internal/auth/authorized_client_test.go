@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"testing"
@@ -13,6 +14,10 @@ import (
 
 func TestAuthorizedClient_LoginPass(t *testing.T) {
 	auth, err := TestAccountAuth()
+
+	//xxx
+	fmt.Printf("\n%q\n", auth.Username)
+
 	assert.NoError(t, err)
 	client := http.Client{}
 	authClient, err := NewAuthorizedClient(context.Background(), &client, auth)
