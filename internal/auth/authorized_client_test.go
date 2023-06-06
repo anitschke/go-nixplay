@@ -16,8 +16,8 @@ func TestAuthorizedClient_LoginPass(t *testing.T) {
 	auth, err := TestAccountAuth()
 
 	//xxx
-	fmt.Printf("\n%q\n", auth.Username)
-	fmt.Printf("\n%q\n", auth.Password)
+	fmt.Printf("\n%d\n", len(auth.Username))
+	fmt.Printf("\n%d\n", len(auth.Password))
 
 	assert.NoError(t, err)
 	client := http.Client{}
