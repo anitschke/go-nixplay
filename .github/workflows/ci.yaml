@@ -22,4 +22,7 @@ jobs:
         go-version: 1.18
 
     - name: Test
+      env:
+        GO_NIXPLAY_TEST_ACCOUNT_USERNAME: ${{ secrets.GO_NIXPLAY_TEST_ACCOUNT_USERNAME }}
+        GO_NIXPLAY_TEST_ACCOUNT_PASSWORD: ${{ secrets.GO_NIXPLAY_TEST_ACCOUNT_PASSWORD }}
       run: go test -v ./...
