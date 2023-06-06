@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
+	"errors"
 	"io"
 	"net/http"
 	"strconv"
@@ -158,13 +159,32 @@ func (c *container) AddPhoto(ctx context.Context, name string, r io.Reader, opts
 	}
 
 	photoData, err := addPhoto(ctx, c.client, albumID, name, r, opts)
+	if errors.Is(err, errDuplicateImage) && c.containerType == types.PlaylistContainerType {
+		// Nixplay doesn't allow photos with duplicate content in the same
+		// album. This can make uploading to playlists a little tricky as it
+		// seems what nixplay really does is upload it directly to the "My
+		// Uploads" album and then behind the scenes links the photo in the "My
+		// Uploads" album with the playlist you tried to upload to. This gets
+		// tricky because if you try to upload the same photo to multiple
+		// playlists the upload monitor errors out indicating that there was a
+		// duplicate, because there was a duplicate in the "My Uploads" album,
+		// not necessarily because there was a duplicate in the playlist (which
+		// is allowed anyway.) Even when the upload monitor errors out like this
+		// the photo still gets added to the playlist so like we wanted.
+		//
+		// So long story short if we are uploading to a container and we get the
+		// errDuplicateImage we can just ignore the error and continue like
+		// normal.
+		err = nil
+	}
 	if err != nil {
 		return nil, err
 	}
 
 	nixplayPhotoID := uint64(0)
+	nixplayPlaylistItemID := ""
 	photoURL := ""
-	p, err := newPhoto(c, c.client, name, &photoData.md5Hash, nixplayPhotoID, photoData.size, photoURL)
+	p, err := newPhoto(c, c.client, name, &photoData.md5Hash, nixplayPhotoID, nixplayPlaylistItemID, photoData.size, photoURL)
 	if err != nil {
 		return nil, err
 	}

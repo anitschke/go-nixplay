@@ -19,6 +19,9 @@ import (
 	"github.com/anitschke/go-nixplay/types"
 )
 
+// xxx doc add documentation to limitations section that nixplay doesn't allow two images with same content in the same album
+var errDuplicateImage = errors.New("failed to upload image as duplicate image with the same content already exists in this album")
+
 type uploadContainerID struct {
 	idName string
 	id     string
@@ -61,15 +64,17 @@ func addPhoto(ctx context.Context, client httpx.Client, containerID uploadContai
 		return uploadedPhoto{}, errors.New("unable to wait for photo to be uploaded")
 	}
 	monitorId := uploadNixplayResponse.UserUploadIDs[0]
-	if err := monitorUpload(ctx, client, monitorId); err != nil {
-		return uploadedPhoto{}, err
-	}
+
+	// We still need to return uploadedPhoto even if monitorUpload errors out because
+	// sometimes monitorUpload returns an error but we can still recover from when uploading
+	// to a playlist. See comments in container.AddPhoto for details
+	err = monitorUpload(ctx, client, monitorId)
 
 	return uploadedPhoto{
 		name:    name,
 		md5Hash: md5Hash,
 		size:    int64(photoData.FileSize),
-	}, nil
+	}, err
 }
 
 type uploadPhotoData struct {
@@ -239,15 +244,18 @@ func monitorUpload(ctx context.Context, client httpx.Client, monitorID string) (
 	defer resp.Body.Close()
 	defer io.Copy(io.Discard, resp.Body)
 
-	// xxx it seems like there is a bug in here where if you try to upload the
-	// same photo into two playlists then it errors out with a 400 with body we
-	// get is "image-exists"
-	//
-	// So what I need to do is check for this and if it happens return a special
-	// errDuplicateImage. Then higher up where we are doing the upload from the
-	// container we can watch for this error. For albums we just throw the error
-	// along, but for playlists when we see this error we can ignore it because
-	// it is a duplicate in the album and will still be added to the playlist.
+	// Special logic to detect duplicate uploads. See comments in
+	// container.AddPhoto.
+	if resp.StatusCode == 400 {
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		if string(body) == "Error: image-exists" {
+			return errDuplicateImage
+		}
+		return fmt.Errorf("http status: %s: body: %s", resp.Status, body)
+	}
 
 	return httpx.StatusError(resp)
 }

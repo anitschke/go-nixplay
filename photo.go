@@ -1,6 +1,7 @@
 package nixplay
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"errors"
@@ -61,14 +62,15 @@ type photo struct {
 	// initially created and as a result may need to be looked up and cached
 	// when needed. As a result all of this data must be guarded by a mutex
 	// because it may change over time.
-	mu        sync.Mutex
-	name      string
-	nixplayID uint64
-	size      int64
-	url       string
+	mu                    sync.Mutex
+	name                  string
+	nixplayID             uint64
+	nixplayPlaylistItemID string
+	size                  int64
+	url                   string
 }
 
-func newPhoto(container Container, client httpx.Client, name string, md5Hash *types.MD5Hash, nixplayID uint64, size int64, url string) (retPhoto *photo, err error) {
+func newPhoto(container Container, client httpx.Client, name string, md5Hash *types.MD5Hash, nixplayID uint64, nixplayPlaylistItemID string, size int64, url string) (retPhoto *photo, err error) {
 	defer errorx.WrapWithFuncNameIfError(&err)
 
 	// Based on current usage of newPhoto the MD5 hash should always be able to
@@ -134,9 +136,10 @@ func newPhoto(container Container, client httpx.Client, name string, md5Hash *ty
 		container: container,
 		client:    client,
 
-		nixplayID: nixplayID,
-		size:      size,
-		url:       url,
+		nixplayID:             nixplayID,
+		nixplayPlaylistItemID: nixplayPlaylistItemID,
+		size:                  size,
+		url:                   url,
 	}, nil
 }
 
@@ -254,19 +257,11 @@ func (p *photo) Open(ctx context.Context) (retReadCloser io.ReadCloser, err erro
 func (p *photo) Delete(ctx context.Context) (err error) {
 	defer errorx.WrapWithFuncNameIfError(&err)
 
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	nixplayID, err := p.getNixplayID(ctx)
+	req, err := p.deleteRequest(ctx)
 	if err != nil {
 		return err
 	}
 
-	url := fmt.Sprintf("https://api.nixplay.com/picture/%d/delete/json/", nixplayID)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, http.NoBody)
-	if err != nil {
-		return err
-	}
 	resp, err := p.client.Do(req)
 	if err != nil {
 		return err
@@ -287,6 +282,47 @@ func (p *photo) Delete(ctx context.Context) (err error) {
 	return nil
 }
 
+func (p *photo) deleteRequest(ctx context.Context) (*http.Request, error) {
+	switch p.container.ContainerType() {
+	case types.AlbumContainerType:
+		return p.albumDeleteRequest(ctx)
+	case types.PlaylistContainerType:
+		return p.playlistDeleteRequest(ctx)
+	}
+	return nil, types.ErrInvalidContainerType
+}
+
+func (p *photo) albumDeleteRequest(ctx context.Context) (*http.Request, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	nixplayID, err := p.getNixplayID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	url := fmt.Sprintf("https://api.nixplay.com/picture/%d/delete/json/", nixplayID)
+	return http.NewRequestWithContext(ctx, http.MethodPost, url, http.NoBody)
+}
+
+func (p *photo) playlistDeleteRequest(ctx context.Context) (*http.Request, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	playlist, ok := p.container.(*container)
+	if !ok {
+		return nil, fmt.Errorf("failed to cast container")
+	}
+
+	nixplayPlaylistItemID, err := p.getNixplayPlaylistItemID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	url := fmt.Sprintf("https://api.nixplay.com/v3/playlists/%d/items?id=%s", playlist.nixplayID, nixplayPlaylistItemID)
+	return http.NewRequestWithContext(ctx, http.MethodDelete, url, bytes.NewReader([]byte{}))
+}
+
 func (p *photo) AddDeletedListener(l cache.ElementDeletedListener) {
 	p.elementDeletedListener = append(p.elementDeletedListener, l)
 }
@@ -301,6 +337,18 @@ func (p *photo) getNixplayID(ctx context.Context) (uint64, error) {
 		return 0, errors.New("unable to determine internal Nixplay ID")
 	}
 	return p.nixplayID, nil
+}
+
+func (p *photo) getNixplayPlaylistItemID(ctx context.Context) (string, error) {
+	if p.nixplayPlaylistItemID == "" {
+		if err := p.populatePhotoDataFromListSearch(ctx); err != nil {
+			return "", fmt.Errorf("failed to get internal Nixplay ID: %w", err)
+		}
+	}
+	if p.nixplayPlaylistItemID == "" {
+		return "", errors.New("unable to determine internal Nixplay ID")
+	}
+	return p.nixplayPlaylistItemID, nil
 }
 
 func (p *photo) populatePhotoDataFromListSearch(ctx context.Context) (err error) {
@@ -356,6 +404,7 @@ func (p *photo) attemptPopulatePhotoDataFromListSearch(ctx context.Context) (boo
 
 		if ppFromContainer.nixplayID != 0 && ppFromContainer.url != "" {
 			p.nixplayID = ppFromContainer.nixplayID
+			p.nixplayPlaylistItemID = ppFromContainer.nixplayPlaylistItemID // we don't check this in the if condition because it is not set for album photos
 			p.url = ppFromContainer.url
 			return true, nil
 		}

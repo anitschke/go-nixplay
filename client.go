@@ -93,6 +93,9 @@ type Container interface {
 	PhotosWithName(ctx context.Context, name string) ([]Photo, error)
 	PhotoWithID(ctx context.Context, id types.ID) (Photo, error) //xxx doc if no photo found then return nil
 
+	//xxx doc different delete behavior with albums and playlists. For playlists
+	//it will not remove the photo from the source album, delete from an album
+	//will remove it from all playlists it was a part of.
 	Delete(ctx context.Context) error
 	AddPhoto(ctx context.Context, name string, r io.Reader, opts AddPhotoOptions) (Photo, error)
 

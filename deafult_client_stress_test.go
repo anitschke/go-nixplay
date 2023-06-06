@@ -73,6 +73,7 @@ func TestDefaultClient_Photos_Stress(t *testing.T) {
 		t.Run(string(tc.containerType), func(t *testing.T) {
 			ctx := context.Background()
 			client := testClient()
+			addMyUploadsCleanup(t, client)
 
 			// create temporary container for testing
 			container := tempContainer(t, client, tc.containerType)

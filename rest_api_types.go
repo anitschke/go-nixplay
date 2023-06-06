@@ -81,7 +81,8 @@ type nixplayAlbumPhoto struct {
 
 func (p nixplayAlbumPhoto) ToPhoto(album Container, client httpx.Client) (Photo, error) {
 	size := int64(-1)
-	return newPhoto(album, client, p.FileName, &p.MD5, p.ID, size, p.URL)
+	nixplayPlaylistItemID := ""
+	return newPhoto(album, client, p.FileName, &p.MD5, p.ID, nixplayPlaylistItemID, size, p.URL)
 }
 
 type playlistPhotosResponse struct {
@@ -101,15 +102,16 @@ func (resp playlistPhotosResponse) ToPhotos(album Container, client httpx.Client
 }
 
 type nixplayPlaylistPhoto struct {
-	ID  uint64 `json:"dbId"`
-	URL string `json:"originalUrl"`
+	ID             uint64 `json:"dbId"`
+	PlaylistItemID string `json:"playlistItemId"`
+	URL            string `json:"originalUrl"`
 }
 
-func (p nixplayPlaylistPhoto) ToPhoto(album Container, client httpx.Client) (Photo, error) {
+func (p nixplayPlaylistPhoto) ToPhoto(playlist Container, client httpx.Client) (Photo, error) {
 	name := ""
 	var md5Hash *types.MD5Hash
 	size := int64(-1)
-	return newPhoto(album, client, name, md5Hash, p.ID, size, p.URL)
+	return newPhoto(playlist, client, name, md5Hash, p.ID, p.PlaylistItemID, size, p.URL)
 }
 
 type uploadTokenResponse struct {
@@ -121,13 +123,13 @@ type uploadNixplayResponseContainer struct {
 }
 
 type uploadNixplayResponse struct {
-	ACL            string `json:"acl"`
-	Key            string `json:"key"`
-	AWSAccessKeyID string `json:"AWSAccessKeyId"`
-	Policy         string `json:"Policy"`
-	Signature      string `json:"Signature"`
-	BatchUploadID string   `json:"batchUploadId"`
-	UserUploadIDs []string `json:"userUploadIds"`
-	FileType      string   `json:"fileType"`
-	S3UploadURL string `json:"s3UploadUrl"`
+	ACL            string   `json:"acl"`
+	Key            string   `json:"key"`
+	AWSAccessKeyID string   `json:"AWSAccessKeyId"`
+	Policy         string   `json:"Policy"`
+	Signature      string   `json:"Signature"`
+	BatchUploadID  string   `json:"batchUploadId"`
+	UserUploadIDs  []string `json:"userUploadIds"`
+	FileType       string   `json:"fileType"`
+	S3UploadURL    string   `json:"s3UploadUrl"`
 }

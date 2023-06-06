@@ -138,6 +138,26 @@ func photoDataSlice(photos []Photo) ([]photoData, error) {
 	return data, nil
 }
 
+func addMyUploadsCleanup(t *testing.T, c Client) {
+	t.Cleanup(func() {
+		deleteAllPhotosFromMyUploads(t, c)
+	})
+}
+
+func deleteAllPhotosFromMyUploads(t *testing.T, c Client) {
+	ctx := context.Background()
+	myUploads, err := c.Container(ctx, types.AlbumContainerType, "My Uploads")
+	require.NoError(t, err)
+
+	photos, err := myUploads.Photos(ctx)
+	require.NoError(t, err)
+
+	for _, p := range photos {
+		err := p.Delete(ctx)
+		assert.NoError(t, err)
+	}
+}
+
 func TestDefaultClient_Containers(t *testing.T) {
 
 	auth, err := auth.TestAccountAuth()
@@ -325,6 +345,7 @@ func TestDefaultClient_Photos(t *testing.T) {
 		t.Run(string(tc.containerType), func(t *testing.T) {
 			ctx := context.Background()
 			client := testClient()
+			addMyUploadsCleanup(t, client)
 
 			// create temporary container for testing
 			container := tempContainer(t, client, tc.containerType)
@@ -563,6 +584,7 @@ func TestDefaultClient_SamePhotoInTwoContainers(t *testing.T) {
 		t.Run(string(tc.containerType), func(t *testing.T) {
 			ctx := context.Background()
 			client := testClient()
+			addMyUploadsCleanup(t, client)
 
 			// create temporary container1 for testing
 			container1 := tempContainer(t, client, tc.containerType)
@@ -574,31 +596,42 @@ func TestDefaultClient_SamePhotoInTwoContainers(t *testing.T) {
 			//////////////////////////
 			// Add To First Container
 			//////////////////////////
-			p1 := func() Photo {
+			upload := func(c Container) Photo {
 				file, err := photoToUpload.Open()
 				require.NoError(t, err)
 				defer file.Close()
-				p, err := container1.AddPhoto(ctx, photoToUpload.Name, file, AddPhotoOptions{})
+				p, err := c.AddPhoto(ctx, photoToUpload.Name, file, AddPhotoOptions{})
 				require.NoError(t, err)
 				return p
-			}()
+			}
+
+			p1 := upload(container1)
 
 			//////////////////////////
 			// Add To Second Container
 			//////////////////////////
-			p2 := func() Photo {
-				file, err := photoToUpload.Open()
-				require.NoError(t, err)
-				defer file.Close()
-				p, err := container2.AddPhoto(ctx, photoToUpload.Name, file, AddPhotoOptions{})
-				require.NoError(t, err)
-				return p
-			}()
+			p2 := upload(container2)
 
 			//////////////////////////
 			// Validate ID uniqueness
 			//////////////////////////
 			assert.NotEqual(t, p1.ID(), p2.ID())
+
+			//////////////////////////
+			// Verify the photos really are in both containers
+			//////////////////////////
+			container1.ResetCache()
+			container2.ResetCache()
+
+			p1Check, err := container1.PhotoWithID(ctx, p1.ID())
+			assert.NoError(t, err)
+			require.NotNil(t, p1Check)
+			assert.Equal(t, p1Check.ID(), p1.ID())
+
+			p2Check, err := container2.PhotoWithID(ctx, p2.ID())
+			assert.NoError(t, err)
+			require.NotNil(t, p2Check)
+			assert.Equal(t, p2Check.ID(), p2.ID())
 
 			//////////////////////////
 			// Download Photo in First Container
@@ -640,14 +673,31 @@ func TestDefaultClient_SamePhotoInTwoContainers(t *testing.T) {
 			//////////////////////////
 			// Delete
 			//////////////////////////
-			//
-			// After we are done we need to delete the photos so they don't get
-			// stuck in the "My Uploads" album (in the case of testing
-			// playlists)
+			// Delete from the photos in the containers should happen
+			// individually. If we delete the photo from container1 the photo
+			// should remain in container2
 			err = p1.Delete(ctx)
 			assert.NoError(t, err)
+
+			container2.ResetCache()
+			p2Check, err = container2.PhotoWithID(ctx, p2.ID())
+			assert.NoError(t, err)
+			require.NotNil(t, p2Check)
+			assert.Equal(t, p2Check.ID(), p2.ID())
+
 			err = p2.Delete(ctx)
 			assert.NoError(t, err)
+
+			container1.ResetCache()
+			container2.ResetCache()
+
+			p1Check, err = container1.PhotoWithID(ctx, p1.ID())
+			assert.NoError(t, err)
+			require.Nil(t, p1Check)
+
+			p2Check, err = container2.PhotoWithID(ctx, p2.ID())
+			assert.NoError(t, err)
+			require.Nil(t, p2Check)
 		})
 	}
 }
