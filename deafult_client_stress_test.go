@@ -78,8 +78,8 @@ func TestDefaultClient_Photos_Stress(t *testing.T) {
 			// create temporary container for testing
 			container := tempContainer(t, client, tc.containerType)
 
-			// create request chan that limits number of concurrent requeists.
-			// Put a stuct in the chan to request to be able to make a request
+			// create request chan that limits number of concurrent requests.
+			// Put a struct in the chan to request to be able to make a request
 			// and pull off the chan when done with the request. see
 			// https://stackoverflow.com/a/25306241
 			requestC := make(chan struct{}, maxConcurrentRequests)

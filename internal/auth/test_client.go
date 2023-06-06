@@ -5,6 +5,8 @@ import (
 	"os"
 )
 
+// xxx add cspell github integration
+
 // xxx add testing with real account to github CI via https://docs.github.com/en/actions/security-guides/encrypted-secrets
 //
 // This also has a good explanation of how to do this https://dev.to/petrsvihlik/using-environment-protection-rules-to-secure-secrets-when-building-external-forks-with-pullrequesttarget-hci

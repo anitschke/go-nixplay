@@ -1,5 +1,6 @@
 package mime
 
+// cSpell:ignore stdmime
 import stdmime "mime"
 
 func init() {

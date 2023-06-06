@@ -181,7 +181,7 @@ func uploadS3(ctx context.Context, client httpx.Client, u uploadNixplayResponse,
 	reqBody := &bytes.Buffer{}
 	writer := multipart.NewWriter(reqBody)
 
-	formVals := map[string]string{
+	formValues := map[string]string{
 		"key":                        u.Key,
 		"acl":                        u.ACL,
 		"content-type":               u.FileType,
@@ -191,7 +191,7 @@ func uploadS3(ctx context.Context, client httpx.Client, u uploadNixplayResponse,
 		"Policy":                     u.Policy,
 		"Signature":                  u.Signature,
 	}
-	for k, v := range formVals {
+	for k, v := range formValues {
 		w, err := writer.CreateFormField(k)
 		if err != nil {
 			return err

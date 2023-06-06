@@ -120,7 +120,7 @@ func newPhoto(container Container, client httpx.Client, name string, md5Hash *ty
 	// the MD5 hash of the photo and that should give us a unique
 	// enough ID with the exception of the above mentioned issue.
 
-	//xxx document the above incompatibility somewhere in reademe
+	//xxx document the above incompatibility somewhere in README
 
 	containerID := container.ID()
 	hasher := sha256.New()
