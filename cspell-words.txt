@@ -1,11 +1,13 @@
 anitschk
 anitschke
+csrftoken
 errorx
 hasher
 httpx
 mynixplay
 nixplay
 Nixplay
+publicsuffix
 rclone
 stretchr
 unmarshalling

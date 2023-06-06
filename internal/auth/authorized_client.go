@@ -59,7 +59,14 @@ func (r loginResponse) parseErrors() error {
 			}
 		}
 	}
-	return errors.Join(errs...)
+
+	// Ideally we would use errors.Join here but we are stuck on go 1.18 and
+	// errors.Join isn't supported until 1.20 :(
+	errorStrings := make([]string, len(errs))
+	for _, err := range errs {
+		errorStrings = append(errorStrings, err.Error())
+	}
+	return errors.New(strings.Join(errorStrings, "\n"))
 }
 
 type Authorization struct {
