@@ -2,22 +2,33 @@ package auth
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/pbkdf2"
 )
 
 func TestAuthorizedClient_LoginPass(t *testing.T) {
 	auth, err := TestAccountAuth()
 
-	//xxx
-	fmt.Printf("\n%d\n", len(auth.Username))
-	fmt.Printf("\n%d\n", len(auth.Password))
+	// GitHub prevents secrets from being printed to the log (which is good) but
+	// when running tests in a GitHub action I ran into some issues where the
+	// signing wasn't working correctly. So to help debug we will log a salted
+	// and hashed username and password. This should be good enough for
+	// security, and allows us to debug to see that the secret is getting injected
+	// into GitHub correctly (by comparing with hash on local machine).
+	saltAndHash := func(secret string) string {
+		salt := "B2NMwfqjjMcRtWsXqsFZ5Mf"
+		return hex.EncodeToString(pbkdf2.Key([]byte(secret), []byte(salt), 4096, 32, sha1.New))
+	}
+	t.Log(saltAndHash(auth.Username))
+	t.Log(saltAndHash(auth.Password))
 
 	assert.NoError(t, err)
 	client := http.Client{}
