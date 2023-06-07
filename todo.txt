@@ -1,3 +1,0 @@
-xxx doc remove this file
-xxx doc add notice that this is largely based on work from https://github.com/andrewjjenkins/picsync
-xxx doc reach out to https://github.com/andrewjjenkins about if I added notice / acknowledgment to his liking

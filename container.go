@@ -160,6 +160,8 @@ func (c *container) AddPhoto(ctx context.Context, name string, r io.Reader, opts
 
 	photoData, err := addPhoto(ctx, c.client, albumID, name, r, opts)
 	if errors.Is(err, errDuplicateImage) && c.containerType == types.PlaylistContainerType {
+		// See https://github.com/anitschke/go-nixplay/#nixplay-meta-model
+		//
 		// Nixplay doesn't allow photos with duplicate content in the same
 		// album. This can make uploading to playlists a little tricky as it
 		// seems what nixplay really does is upload it directly to the "My
