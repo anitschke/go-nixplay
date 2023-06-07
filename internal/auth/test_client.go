@@ -16,7 +16,11 @@ const (
 	testPasswordEnvVar = "GO_NIXPLAY_TEST_ACCOUNT_PASSWORD"
 )
 
-// xxx doc
+// TestAccountAuth gets the test account Authorization 
+//
+// Authorization details are obtained from the
+// "GO_NIXPLAY_TEST_ACCOUNT_USERNAME" and "GO_NIXPLAY_TEST_ACCOUNT_PASSWORD"
+// environment variables. For more details ../../README.md#Testing xxx
 func TestAccountAuth() (Authorization, error) {
 	username := os.Getenv(testUsernameEnvVar)
 	password := os.Getenv(testPasswordEnvVar)
