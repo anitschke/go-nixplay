@@ -24,7 +24,7 @@ func TestAuthorizedClient_LoginPass(t *testing.T) {
 	// security, and allows us to debug to see that the secret is getting injected
 	// into GitHub correctly (by comparing with hash on local machine).
 	saltAndHash := func(secret string) string {
-		salt := "B2NMwfqjjMcRtWsXqsFZ5Mf"
+		salt := "B2NMwfqjjMcRtWsXqsFZ5Mf" // cspell:disable-line
 		return hex.EncodeToString(pbkdf2.Key([]byte(secret), []byte(salt), 4096, 32, sha1.New))
 	}
 	t.Log(saltAndHash(auth.Username))
