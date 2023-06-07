@@ -15,9 +15,13 @@ import (
 	"github.com/anitschke/go-nixplay/types"
 )
 
-// xxx doc
+// DefaultClientOptions are optional inputs that may be specified for creating a
+// DefaultClient
 type DefaultClientOptions struct {
-	// xxx doc optional
+	// HTTPClient is the HTTP Client that will be used to communicate with the
+	// Nixplay servers.
+	//
+	// If no client is specified then the default http.Client will be used.
 	HTTPClient httpx.Client
 }
 
