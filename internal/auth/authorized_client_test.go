@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/anitschke/go-nixplay/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/pbkdf2"
@@ -38,7 +39,7 @@ func TestAuthorizedClient_LoginPass(t *testing.T) {
 }
 
 func TestAuthorizedClient_LoginFail_EmptyLogin(t *testing.T) {
-	invalidAuth := Authorization{
+	invalidAuth := types.Authorization{
 		Username: "",
 		Password: "",
 	}
@@ -51,7 +52,7 @@ func TestAuthorizedClient_LoginFail_EmptyLogin(t *testing.T) {
 }
 
 func TestAuthorizedClient_LoginFail_InvalidLogin(t *testing.T) {
-	invalidAuth := Authorization{
+	invalidAuth := types.Authorization{
 		Username: "ThisIsNotAValidUser",
 		Password: "ThisIsNotAValidPassword",
 	}
