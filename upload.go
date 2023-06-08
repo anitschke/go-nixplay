@@ -20,7 +20,6 @@ import (
 	"github.com/anitschke/go-nixplay/types"
 )
 
-// xxx doc add documentation to limitations section that nixplay doesn't allow two images with same content in the same album
 var errDuplicateImage = errors.New("failed to upload image as duplicate image with the same content already exists in this album")
 
 type uploadContainerID struct {

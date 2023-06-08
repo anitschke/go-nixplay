@@ -15,7 +15,7 @@ type AddPhotoOptions struct {
 	//
 	// Specifying the MIME Type is optional. However Nixplay does require that
 	// the MIME Type is provided, so if a MIME Type is not specified then one
-	// will be inferred from the file extension. 
+	// will be inferred from the file extension.
 	//
 	// According to Nixplay documentation  JPEG, PNG, TIFF, HEIC, MP4 are all
 	// supported see the following for more details:
@@ -25,7 +25,7 @@ type AddPhotoOptions struct {
 	// Request error from the server.
 	MIMEType string
 
-	// FileSize in bytes of the photo to be uploaded to Nixplay. 
+	// FileSize in bytes of the photo to be uploaded to Nixplay.
 	//
 	// Specifying the MIME Type is optional. However Nixplay does require that
 	// the file size is provided, so if the the size is not specified then it
@@ -36,93 +36,108 @@ type AddPhotoOptions struct {
 	FileSize int64
 }
 
-// xxx doc Add comment in limitations section of doc that it is possible to remove a
-// photo from an playlist without removing it from the album it lives in but for
-// the purpose of keeping things simple right now we don't support that. We just
-// always delete the photo from everywhere.
-//
-// xxx doc nixplay has a few different flavors of delete. For albums it looks
-// like you can only delete. but for playlists it looks like you can choose to
-// totally delete the photo, or remove it from the playlist but keep it around
-// in the album it belongs in.
-//
-// I did some playing around and there is also some weird and buggy feeling
-// behavior. If you choose the "permanently  delete" option in playlist it will
-// remove ALL instances of that photo if it exists in multiple albums and not
-// just from the one album it was added from. This happens even if you manually
-// upload the photo multiple times to different albums instead of using
-// Nixplay's copy to album option. This is in contrast to deleting a photo from
-// a album where the only option is to remove it from that one album.
-//
-// The sort of exception to this is that photos are owned by a album and
-// playlists are only associated to a photo, so if you delete a photo from an
-// album then it will also be removed from any playlists it was a part of.
-//
-// Given all of this I think the easiest thing to do is to use a flavor of
-// delete where we only remove the photo from the container you got it from
-// instead of doing a more global delete of it. This should give relatively
-// consistent behavior regardless of what sort of container it is coming from.
-//
-// The downside of the above easiest option is that it means that if I setup
-// rclone to just sync a playlist, then when a photo is deleted from the
-// playlist it will essentially "leak" the photo in the downloads folder and
-// that could bloat memory usage to the point where I might start running out of
-// storage space if stuff changes often. I think the answer to this is have a
-// "DeleteScope" option that says at what scope the file will be deleted, either
-// global or local to playlist. Then setup rsync where there is an option that
-// lets you pick how delete of photos in a playlist will be handled.
-//
-// All this means that at the moment we will only support GlobalDeleteScope for
-// playlists and not albums. If we really wanted we could support
-// GlobalDeleteScope by getting a list of all the photos, comparing the md5 hash
-// and deleting any that have the same hash. But this would be expensive... so
-// lets just error out for now if someone tries to use global for deleting a
-// photo from an album.
-
-//xxx doc no guarantee that IDs will remain the same for same objects in the future
-
-// xxx doc
+// Client is the interface that is essentially the entrypoint into communicating
+// with Nixplay. It provides the ability to query containers (albums or
+// playlists) or create new containers.
 type Client interface {
+
+	// Containers gets all containers of the specified ContainerType
 	Containers(ctx context.Context, containerType types.ContainerType) ([]Container, error)
 
-	// Container gets the specified container based on type and name.
+	// Container gets a container based on type and name.
 	//
-	// If the specified container could not be found then a nil container will be returned
+	// If the specified container could not be found then a nil container will
+	// be returned
 	Container(ctx context.Context, containerType types.ContainerType, name string) (Container, error)
 
+	// CreateContainer creates a container of the specified type and name.
 	CreateContainer(ctx context.Context, containerType types.ContainerType, name string) (Container, error)
-}
 
-// xxx doc
-type Container interface {
-	ID() types.ID
-	ContainerType() types.ContainerType
-
-	Name(ctx context.Context) (string, error)
-	PhotoCount(ctx context.Context) (int64, error)
-	Photos(ctx context.Context) ([]Photo, error)
-	PhotosWithName(ctx context.Context, name string) ([]Photo, error)
-	PhotoWithID(ctx context.Context, id types.ID) (Photo, error) //xxx doc if no photo found then return nil
-
-	//xxx doc different delete behavior with albums and playlists. For playlists
-	//it will not remove the photo from the source album, delete from an album
-	//will remove it from all playlists it was a part of.
-	Delete(ctx context.Context) error
-	AddPhoto(ctx context.Context, name string, r io.Reader, opts AddPhotoOptions) (Photo, error)
-
-	// xxx doc May be called to reset the Containers internal cache of photos
+	// Reset cache resets the internal cache of containers
+	//
+	// For more details see https://github.com/anitschke/go-nixplay/#caching
 	ResetCache()
 }
 
-// xxx doc
+// Container is the interface for an object that contains photos, either an
+// album or playlist.
+type Container interface {
+	// ID is a unique identifier for the container. This identifier is
+	// guaranteed to stable across go-nixplay sessions although the identifier
+	// for a given container may change with upgrades to go-nixplay. Note that
+	// this identifier may be different than the internal identifier used by
+	// Nixplay to identifier an album or playlist.
+	ID() types.ID
+
+	ContainerType() types.ContainerType
+
+	Name(ctx context.Context) (string, error)
+
+	// PhotoCount gets the number of photos within the container.
+	//
+	// Note that this API is often times more efficient than len(c.Photos)
+	PhotoCount(ctx context.Context) (int64, error)
+
+	// Photos gets all photos in the container
+	Photos(ctx context.Context) ([]Photo, error)
+
+	// PhotosWithName gets all photos in the container with the specified name.
+	PhotosWithName(ctx context.Context, name string) ([]Photo, error)
+
+	// PhotoWithID gets the photo in the container with the specified ID.
+	//
+	// If no photo with the specified ID can be found in the container nil is
+	// returned.
+	PhotoWithID(ctx context.Context, id types.ID) (Photo, error)
+
+	// Delete deletes the container.
+	//
+	// See
+	// https://github.com/anitschke/go-nixplay/#photo-additiondelete-is-not-atomic
+	// for further discussion of delete behavior.
+	Delete(ctx context.Context) error
+	AddPhoto(ctx context.Context, name string, r io.Reader, opts AddPhotoOptions) (Photo, error)
+
+	// Reset cache resets the internal cache of photos
+	//
+	// For more details see https://github.com/anitschke/go-nixplay/#caching
+	ResetCache()
+}
+
+// Photo is an interface for an object that represents a photo. Even though a
+// photo may exist in one album and multiple playlists the Photo object
+// represents a photo within the specific Container object that it was obtained
+// from.
 type Photo interface {
+	// ID is a unique identifier for the photo. This identifier is guaranteed to
+	// stable across go-nixplay sessions although the identifier for a given
+	// container may change with upgrades to go-nixplay. Note that this
+	// identifier may be different than the internal identifier used by Nixplay
+	// to identifier a photo.
+	//
+	// Note copies of the same photo in different containers will have a unique
+	// identifier.
+	//
+	// Note that duplicate copies of the same photo within the same playlist
+	// will have the same identifier. See further discussion of this issue in
+	// https://github.com/anitschke/go-nixplay/#multiple-copies-of-photos-in-playlist
 	ID() types.ID
 
 	Name(ctx context.Context) (string, error)
 	Size(ctx context.Context) (int64, error)
 	MD5Hash(ctx context.Context) (types.MD5Hash, error)
+
+	// URL returns the URL for the original photo that was uploaded to Nixplay.
 	URL(ctx context.Context) (string, error)
 
+	// Open opens the photo for reading the contents of the photo.
 	Open(ctx context.Context) (io.ReadCloser, error)
+
+	// Delete deletes the photo from the parent container that this photo object
+	// was obtained from.
+	//
+	// See
+	// https://github.com/anitschke/go-nixplay/#photo-additiondelete-is-not-atomic
+	// for further discussion of delete behavior.
 	Delete(ctx context.Context) error
 }

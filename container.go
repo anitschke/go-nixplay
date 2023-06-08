@@ -16,10 +16,18 @@ import (
 	"github.com/anitschke/go-nixplay/types"
 )
 
+// photoPageSize is the number of photos we will request per album/playlist page
+// of photos. In theory we might be able to simplify the code by getting all the
+// photos in a single request but I am not sure if the API may automatically
+// paginate at some point. So we will just play it on the safe side.
 const photoPageSize = uint64(100)
 
-// xxx doc assume first page is page 0
+// photoPageFunc is a function that returns the photos on a the specified page.
+// The first page is page 0.
 type photoPageFunc = func(ctx context.Context, client httpx.Client, container Container, nixplayID uint64, page uint64, pageSize uint64) ([]Photo, error)
+
+// deleteRequestFunc is a function that can be used to create a *http.Request to
+// delete a photo.
 type deleteRequestFunc = func(ctx context.Context, nixplayID uint64) (*http.Request, error)
 
 type container struct {

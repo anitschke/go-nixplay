@@ -6,7 +6,6 @@ import (
 	"net/http"
 )
 
-// xxx doc
 func StatusError(resp *http.Response) error {
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(resp.Body)

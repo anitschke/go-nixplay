@@ -41,14 +41,6 @@ var sizeFromContentRangeRegexp = regexp.MustCompile(`^bytes \d+-\d+/(\d+)$`)
 var md5HashFromPhotoURLPath = regexp.MustCompile(`^/\d+/\d+_([A-Fa-f0-9]{32})`)
 
 // photo is the type that implements the Photo interface.
-//
-// The object hierarchy here gets a little strange because there are some
-// differences between album photos and playlist photos, but 90% of the code is
-// the same. So photo does most of the heavy lifting and then makes a call out
-// to photoImplementation when it needs implementation specific info regarding
-// album/playlist photos.
-//
-// xxx doc photoImplementation doesn't exist anymore
 type photo struct {
 	id      types.ID
 	md5Hash types.MD5Hash
@@ -119,8 +111,6 @@ func newPhoto(container Container, client httpx.Client, name string, md5Hash *ty
 	// So with all that being said we will hash the container id together with
 	// the MD5 hash of the photo and that should give us a unique
 	// enough ID with the exception of the above mentioned issue.
-
-	//xxx document the above incompatibility somewhere in README
 
 	containerID := container.ID()
 	hasher := sha256.New()
@@ -443,11 +433,18 @@ func (p *photo) populatePhotoDataFromPictureEndpoint(ctx context.Context) (err e
 }
 
 func (p *photo) populatePhotoDataFromHead(ctx context.Context) (err error) {
-	// xxx doc Getting the size of the photo is a little tricky. Ideally we could
-	// use the HEAD method but the way s3 Signature works is it is for a
-	// specific method. xxx doc add rest of details
+	// Getting the size of the photo is a little tricky. Ideally we could use
+	// the HEAD method but for some reason it doesn't work. The reading I did
+	// suggests the cause is the way S3 signature works is it is for a specific
+	// HTTP method. So we are authorized to GET the photo but not HEAD.
 	//
-	// https://stackoverflow.com/a/39663152 curl -v -r 0-0
+	// So what we will do is send a GET request for only a single byte of the
+	// photo using the "Range" = "bytes=0-0" header. Then we can read what the
+	// full size of the photo is by using the "Content-Range" from the response
+	// header.
+	//
+	// For details about this with S3 issue see
+	// https://stackoverflow.com/a/39663152
 	//
 	// This relies on s3 honoring our request for only a single byte which at
 	// the moment it does so I think we can just assume it will continue to do
