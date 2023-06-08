@@ -2,7 +2,7 @@ package auth
 
 import (
 	"context"
-	"crypto/sha1"
+	"crypto/sha512"
 	"encoding/hex"
 	"encoding/json"
 	"io"
@@ -25,7 +25,7 @@ func TestAuthorizedClient_LoginPass(t *testing.T) {
 	// into GitHub correctly (by comparing with hash on local machine).
 	saltAndHash := func(secret string) string {
 		salt := "B2NMwfqjjMcRtWsXqsFZ5Mf" // cspell:disable-line
-		return hex.EncodeToString(pbkdf2.Key([]byte(secret), []byte(salt), 4096, 32, sha1.New))
+		return hex.EncodeToString(pbkdf2.Key([]byte(secret), []byte(salt), 1000000, 32, sha512.New))
 	}
 	t.Log(saltAndHash(auth.Username))
 	t.Log(saltAndHash(auth.Password))
