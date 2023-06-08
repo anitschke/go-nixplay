@@ -11,6 +11,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strconv"
 
@@ -101,22 +102,33 @@ func getUploadPhotoData(name string, r io.Reader, opts AddPhotoOptions) (retData
 		}
 	}
 
-	// If we don't know the file size we will first try to use seeker APIs to
-	// get the size since that is most efficient. If that doesn't work we will
+	// If we don't know the file size we will try a few different APIs to try to
+	// determine the size of the photo efficiently. If that doesn't work we will
 	// resort to reading into a buffer which requires us to buffer the entire
 	// file into memory, not ideal.
 	if data.FileSize == 0 {
-		if s, ok := r.(io.Seeker); ok {
+		switch photo := r.(type) {
+		case *os.File:
+			fileInfo, err := photo.Stat()
+			if err != nil {
+				return uploadPhotoData{}, nil, err
+			}
+			data.FileSize = fileInfo.Size()
+		case *bytes.Buffer:
+			data.FileSize = int64(photo.Len())
+		case *bytes.Reader:
+			data.FileSize = photo.Size()
+		case io.Seeker:
 			var err error
-			data.FileSize, err = s.Seek(0, io.SeekEnd)
+			data.FileSize, err = photo.Seek(0, io.SeekEnd)
 			if err != nil {
 				return uploadPhotoData{}, nil, err
 			}
 			// seek back to the start of file so that it can be read again properly
-			if _, err := s.Seek(0, io.SeekStart); err != nil {
+			if _, err := photo.Seek(0, io.SeekStart); err != nil {
 				return uploadPhotoData{}, nil, err
 			}
-		} else {
+		default:
 			var err error
 			buf := new(bytes.Buffer)
 			data.FileSize, err = buf.ReadFrom(r)
@@ -124,6 +136,7 @@ func getUploadPhotoData(name string, r io.Reader, opts AddPhotoOptions) (retData
 				return uploadPhotoData{}, nil, err
 			}
 			r = buf
+
 		}
 	}
 

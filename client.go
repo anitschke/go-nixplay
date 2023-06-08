@@ -8,10 +8,14 @@ import (
 	"github.com/anitschke/go-nixplay/types"
 )
 
+// AddPhotoOptions are optional arguments may be specified when adding photos to
+// Nixplay.
 type AddPhotoOptions struct {
-	// xxx doc optional, if not specified it will be inferred from file
-	// extension, if it can not be inferred from extension of file it will throw
-	// a documented error.
+	// MIMEType of the photo to be uploaded.
+	//
+	// Specifying the MIME Type is optional. However Nixplay does require that
+	// the MIME Type is provided, so if a MIME Type is not specified then one
+	// will be inferred from the file extension. 
 	//
 	// According to Nixplay documentation  JPEG, PNG, TIFF, HEIC, MP4 are all
 	// supported see the following for more details:
@@ -21,7 +25,14 @@ type AddPhotoOptions struct {
 	// Request error from the server.
 	MIMEType string
 
-	//xxx doc optional, if not specified it will be computed from reader
+	// FileSize in bytes of the photo to be uploaded to Nixplay. 
+	//
+	// Specifying the MIME Type is optional. However Nixplay does require that
+	// the file size is provided, so if the the size is not specified then it
+	// will be computed based on the io.Reader provided. An attempt will be made
+	// to efficiently compute the size without buffering the entire photo into
+	// memory however in some cases it may be necessary to buffer the full photo
+	// into memory.
 	FileSize int64
 }
 
