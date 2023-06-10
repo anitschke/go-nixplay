@@ -34,7 +34,7 @@ type DefaultClient struct {
 
 var _ = (Client)((*DefaultClient)(nil))
 
-func NewDefaultClient(ctx context.Context, a auth.Authorization, opts DefaultClientOptions) (*DefaultClient, error) {
+func NewDefaultClient(ctx context.Context, a types.Authorization, opts DefaultClientOptions) (*DefaultClient, error) {
 	if opts.HTTPClient == nil {
 		opts.HTTPClient = &http.Client{}
 	}

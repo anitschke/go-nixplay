@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/anitschke/go-nixplay/httpx"
+	"github.com/anitschke/go-nixplay/types"
 	"golang.org/x/net/publicsuffix"
 )
 
@@ -69,11 +70,6 @@ func (r loginResponse) parseErrors() error {
 	return errors.New(strings.Join(errorStrings, "\n"))
 }
 
-type Authorization struct {
-	Username string
-	Password string
-}
-
 type auth struct {
 	token     string
 	csrfToken string
@@ -93,7 +89,7 @@ type AuthorizedClient struct {
 
 var _ = (httpx.Client)((*AuthorizedClient)(nil))
 
-func NewAuthorizedClient(ctx context.Context, client httpx.Client, authIn Authorization) (*AuthorizedClient, error) {
+func NewAuthorizedClient(ctx context.Context, client httpx.Client, authIn types.Authorization) (*AuthorizedClient, error) {
 	auth, err := doAuth(ctx, client, authIn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create authorized http client: %w", err)
@@ -104,7 +100,7 @@ func NewAuthorizedClient(ctx context.Context, client httpx.Client, authIn Author
 	}, nil
 }
 
-func doAuth(ctx context.Context, client httpx.Client, authIn Authorization) (auth, error) {
+func doAuth(ctx context.Context, client httpx.Client, authIn types.Authorization) (auth, error) {
 	parsedLoginURL, err := url.Parse(loginURL)
 	if err != nil {
 		return auth{}, err

@@ -8,6 +8,15 @@ import (
 	"fmt"
 )
 
+// Authorization is a struct representing authorization details needed to sign
+// in to use this API.
+//
+// Currently both Username and Password are required.
+type Authorization struct {
+	Username string
+	Password string
+}
+
 // ContainerType is the enum that describes the Nixplay container type that
 // holds photos, either album or playlist.
 type ContainerType string
