@@ -84,6 +84,10 @@ type Container interface {
 	// PhotosWithName gets all photos in the container with the specified name.
 	PhotosWithName(ctx context.Context, name string) ([]Photo, error)
 
+	// PhotoWithUniqueName gets the photo in the container with the unique name
+	// as returned by Photo.NameUnique
+	PhotoWithUniqueName(ctx context.Context, name string) (Photo, error)
+
 	// PhotoWithID gets the photo in the container with the specified ID.
 	//
 	// If no photo with the specified ID can be found in the container nil is
@@ -124,6 +128,11 @@ type Photo interface {
 	ID() types.ID
 
 	Name(ctx context.Context) (string, error)
+	// NameUnique returns a name that has an additional unique ID appended to
+	// the end name if there are photos with the same name in the container that
+	// this photo resides in. If there are no photos with the same name in the
+	// container then NameUnique returns the same thing as Name.
+	NameUnique(ctx context.Context) (string, error)
 	Size(ctx context.Context) (int64, error)
 	MD5Hash(ctx context.Context) (types.MD5Hash, error)
 

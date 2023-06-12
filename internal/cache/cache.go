@@ -18,6 +18,15 @@ type ListenableElement interface {
 	AddDeletedListener(l ElementDeletedListener)
 }
 
+type ElementUniqueNameGenerator interface {
+	Element
+
+	// GenerateUniqueName generates a unique name, it does not need to check if
+	// any other element share the same "normal" name before generating the
+	// unique version of it's name
+	GenerateUniqueName(ctx context.Context) (string, error)
+}
+
 type ElementDeletedListener interface {
 	ElementDeleted(ctx context.Context, e Element) error
 }
@@ -34,11 +43,12 @@ type elementPageFunc[T Element] func(ctx context.Context, page uint64) ([]T, err
 type Cache[T Element] struct {
 	elementPageFunc elementPageFunc[T]
 
-	mu             sync.Mutex
-	foundAll       bool
-	elements       []T
-	nameToElements map[string][]T
-	idToElement    map[types.ID]T
+	mu                  sync.Mutex
+	foundAll            bool
+	elements            []T
+	nameToElements      map[string][]T
+	uniqueNameToElement map[string]T
+	idToElement         map[types.ID]T
 
 	elementDeletedListener []ElementDeletedListener
 }
@@ -100,6 +110,28 @@ func (c *Cache[T]) ElementsWithName(ctx context.Context, name string) ([]T, erro
 	elements := make([]T, len(elementsWithName))
 	copy(elements, elementsWithName)
 	return elements, nil
+}
+
+func (c *Cache[T]) ElementWithUniqueName(ctx context.Context, name string) (T, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if err := c.loadAllUnsafe(ctx); err != nil {
+		var empty T
+		return empty, err
+	}
+
+	if err := c.populateNameMapUnsafe(ctx); err != nil {
+		var empty T
+		return empty, err
+	}
+
+	if err := c.populateUniqueNameMapUnsafe(ctx); err != nil {
+		var empty T
+		return empty, err
+	}
+
+	return c.uniqueNameToElement[name], nil
 }
 
 // get the element with the specified ID. In the event that there is no element
@@ -165,6 +197,7 @@ func (c *Cache[T]) addElementUnsafe(p T) {
 	c.idToElement[id] = p
 
 	c.nameToElements = nil
+	c.uniqueNameToElement = nil
 
 	// To aid in not having to transform big slices of interfaces around the
 	// types we store the same interface that we will expose to the eventual API
@@ -199,6 +232,51 @@ func (pc *Cache[T]) populateNameMapUnsafe(ctx context.Context) (err error) {
 	}()
 
 	pc.nameToElements = make(map[string][]T)
+	for _, p := range pc.elements {
+		name, err := p.Name(ctx)
+		if err != nil {
+			return err
+		}
+		pc.nameToElements[name] = append(pc.nameToElements[name], p)
+	}
+	return nil
+}
+
+func (pc *Cache[T]) populateUniqueNameMapUnsafe(ctx context.Context) (err error) {
+	if pc.uniqueNameToElement != nil {
+		return nil
+	}
+
+	defer func() {
+		if err != nil {
+			pc.uniqueNameToElement = nil
+		}
+	}()
+
+	pc.uniqueNameToElement = make(map[string]T)
+	for name, elements := range pc.nameToElements {
+		if len(elements) == 1 {
+			pc.uniqueNameToElement[name] = elements[0]
+		} else {
+			for _, e := range elements {
+				uniquer, ok := any(e).(ElementUniqueNameGenerator)
+				if !ok {
+					return fmt.Errorf("unable to produce unique name map because %T does not implement ElementUniqueNameGenerator", e)
+				}
+				uName, err := uniquer.GenerateUniqueName(ctx)
+				if err != nil {
+					return err
+				}
+				// Double check there isn't already an element with that unique name
+				_, ok = pc.uniqueNameToElement[uName]
+				if ok {
+					return fmt.Errorf("multiple elements with the unique name %q exist", uName)
+				}
+				pc.uniqueNameToElement[uName] = e
+			}
+		}
+
+	}
 	for _, p := range pc.elements {
 		name, err := p.Name(ctx)
 		if err != nil {
@@ -289,6 +367,8 @@ func (c *Cache[T]) Remove(ctx context.Context, e T) (err error) {
 		}
 	}
 
+	c.uniqueNameToElement = nil
+
 	// Delete the photo from the idToPhoto map
 	delete(c.idToElement, e.ID())
 
@@ -309,5 +389,6 @@ func (c *Cache[T]) resetUnsafe() {
 	c.foundAll = false
 	c.elements = nil
 	c.nameToElements = nil
+	c.uniqueNameToElement = nil
 	c.idToElement = make(map[types.ID]T)
 }

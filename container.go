@@ -149,6 +149,11 @@ func (c *container) PhotosWithName(ctx context.Context, name string) (retPhoto [
 	return c.photoCache.ElementsWithName(ctx, name)
 }
 
+func (c *container) PhotoWithUniqueName(ctx context.Context, name string) (retPhoto Photo, err error) {
+	defer errorx.WrapWithFuncNameIfError(&err)
+	return c.photoCache.ElementWithUniqueName(ctx, name)
+}
+
 func (c *container) PhotoWithID(ctx context.Context, id types.ID) (retPhoto Photo, err error) {
 	defer errorx.WrapWithFuncNameIfError(&err)
 	return c.photoCache.ElementWithID(ctx, id)
