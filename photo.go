@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"sync"
@@ -170,6 +172,56 @@ func (p *photo) Name(ctx context.Context) (string, error) {
 	}
 
 	return p.name, nil
+}
+
+func (p *photo) NameUnique(ctx context.Context) (string, error) {
+	name, err := p.Name(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	allWithName, err := p.container.PhotosWithName(ctx, name)
+	if err != nil {
+		return "", err
+	}
+	if len(allWithName) == 0 {
+		return "", errors.New("failed to find existing photo when creating unique name")
+	}
+	if len(allWithName) == 1 {
+		return name, nil
+	}
+
+	// Double check that we really can form a unique name. At the moment there
+	// are some issues where if we have duplicates of a photo within a playlist
+	// we have no way of producing a unique ID for those duplicate photos.
+	ids := make(map[types.ID]int)
+	for _, other := range allWithName {
+		ids[other.ID()]++
+	}
+	if ids[p.ID()] > 1 {
+		return "", errors.New("failed to create unique ID for photo")
+	}
+
+	return p.GenerateUniqueName(ctx)
+}
+
+// GenerateUniqueName is an internal function used to generate a name unique
+// name when we know there is another photo that shares the same "non-unique"
+// name.
+func (p *photo) GenerateUniqueName(ctx context.Context) (string, error) {
+	name, err := p.Name(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	ext := filepath.Ext(name)
+	base := name[:len(name)-len(ext)]
+
+	id := p.ID()
+	idString := base64.URLEncoding.EncodeToString(id[:])
+
+	uniqueName := base + "{" + idString + "}" + ext
+	return uniqueName, nil
 }
 
 func (p *photo) ID() types.ID {

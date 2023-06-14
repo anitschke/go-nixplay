@@ -699,3 +699,137 @@ func TestDefaultClient_SamePhotoInTwoContainers(t *testing.T) {
 		})
 	}
 }
+
+func TestDefaultClient_DuplicatePhotoNameInSameContainer(t *testing.T) {
+	type testData struct {
+		containerType types.ContainerType
+	}
+
+	tests := []testData{
+		{
+			containerType: types.AlbumContainerType,
+		},
+		{
+			containerType: types.PlaylistContainerType,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(string(tc.containerType), func(t *testing.T) {
+			ctx := context.Background()
+			client := testClient()
+			addMyUploadsCleanup(t, client)
+
+			// create temporary container for testing
+			container := tempContainer(t, client, tc.containerType)
+			allTestPhotos, err := photos.AllPhotos()
+			require.NoError(t, err)
+
+			// We only need to test this with at few photos
+			nonUniqueName := "nonUniqueName.jpg"
+			allTestPhotos = allTestPhotos[:3]
+			assert.Len(t, allTestPhotos, 3)
+
+			//////////////////////////
+			// List
+			//////////////////////////
+			photos, err := container.Photos(ctx)
+			assert.NoError(t, err)
+			assert.Empty(t, photos)
+
+			//////////////////////////
+			// Add
+			//////////////////////////
+			addedPhotos := make([]Photo, 0, len(allTestPhotos))
+			for i, tp := range allTestPhotos {
+				file, err := tp.Open()
+				require.NoError(t, err)
+				defer file.Close()
+				p, err := container.AddPhoto(ctx, nonUniqueName, file, AddPhotoOptions{})
+				require.NoError(t, err)
+
+				name, err := p.Name(ctx)
+				assert.NoError(t, err)
+				assert.Equal(t, name, nonUniqueName)
+
+				// If this is the first time the loop is running then there are
+				// no other photos with this name so unique name should return
+				// the same thing as name
+				if i == 0 {
+					uniqueName, err := p.NameUnique(ctx)
+					assert.NoError(t, err)
+					assert.Equal(t, uniqueName, nonUniqueName)
+				}
+
+				addedPhotos = append(addedPhotos, p)
+			}
+
+			// Now double check now that all photos have a unique name
+			var uniqueNames []string
+			uniqueNameSet := make(map[string]struct{})
+			for _, p := range addedPhotos {
+				uniqueName, err := p.NameUnique(ctx)
+				assert.NoError(t, err)
+				assert.NotEqual(t, uniqueName, nonUniqueName)
+				uniqueNames = append(uniqueNames, uniqueName)
+				uniqueNameSet[uniqueName] = struct{}{}
+			}
+			assert.Len(t, uniqueNameSet, 3)
+
+			//////////////////////////
+			// Get Photos By Name
+			//////////////////////////
+			photosWithName, err := container.PhotosWithName(ctx, nonUniqueName)
+			assert.NoError(t, err)
+			require.Len(t, photosWithName, 3)
+
+			//////////////////////////
+			// Get Photos By UniqueName
+			//////////////////////////
+			for i, uName := range uniqueNames {
+				p, err := container.PhotoWithUniqueName(ctx, uName)
+				assert.NoError(t, err)
+				require.Equal(t, p, addedPhotos[i])
+			}
+
+			//////////////////////////
+			// Delete
+			//////////////////////////
+			err = addedPhotos[0].Delete(ctx)
+			assert.NoError(t, err)
+			err = addedPhotos[1].Delete(ctx)
+			assert.NoError(t, err)
+
+			// Now that we have deleted 2 of the 3 photos with the same name the
+			// third should no longer need a unique name.
+			name, err := addedPhotos[2].Name(ctx)
+			assert.NoError(t, err)
+			assert.Equal(t, name, nonUniqueName)
+
+			uName, err := addedPhotos[2].NameUnique(ctx)
+			assert.NoError(t, err)
+			assert.Equal(t, uName, nonUniqueName)
+
+			photos, err = container.PhotosWithName(ctx, nonUniqueName)
+			assert.NoError(t, err)
+			assert.Len(t, photos, 1)
+			assert.Equal(t, addedPhotos[2].ID(), photos[0].ID())
+
+			p, err := container.PhotoWithUniqueName(ctx, nonUniqueName)
+			assert.NoError(t, err)
+			assert.Equal(t, addedPhotos[2].ID(), p.ID())
+
+			for _, p := range addedPhotos {
+				err := p.Delete(ctx)
+				assert.NoError(t, err)
+			}
+
+			//////////////////////////
+			// List
+			//////////////////////////
+			photos, err = container.Photos(ctx)
+			assert.NoError(t, err)
+			assert.Empty(t, photos)
+		})
+	}
+}
