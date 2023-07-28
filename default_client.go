@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/anitschke/go-nixplay/encoding"
 	"github.com/anitschke/go-nixplay/httpx"
 	"github.com/anitschke/go-nixplay/internal/auth"
 	"github.com/anitschke/go-nixplay/internal/cache"
@@ -97,7 +98,7 @@ func (c *DefaultClient) albumsFromURL(ctx context.Context, url string) ([]Contai
 	if err := httpx.DoUnmarshalJSONResponse(c.client, req, &albums); err != nil {
 		return nil, err
 	}
-	return albums.ToContainers(c.client), nil
+	return albums.ToContainers(c.client, c), nil
 }
 
 func (c *DefaultClient) playlistsPage(ctx context.Context, page uint64) ([]Container, error) {
@@ -121,11 +122,11 @@ func (c *DefaultClient) playlists(ctx context.Context) ([]Container, error) {
 	if err := httpx.DoUnmarshalJSONResponse(c.client, req, &playlists); err != nil {
 		return nil, err
 	}
-	return playlists.ToContainers(c.client), nil
+	return playlists.ToContainers(c.client, c), nil
 
 }
 
-func (c *DefaultClient) Container(ctx context.Context, containerType types.ContainerType, name string) (Container, error) {
+func (c *DefaultClient) ContainersWithName(ctx context.Context, containerType types.ContainerType, name string) ([]Container, error) {
 	var cache *cache.Cache[Container]
 	switch containerType {
 	case types.AlbumContainerType:
@@ -136,25 +137,43 @@ func (c *DefaultClient) Container(ctx context.Context, containerType types.Conta
 		return nil, types.ErrInvalidContainerType
 	}
 
-	containers, err := cache.ElementsWithName(ctx, name)
-	if err != nil {
-		return nil, err
+	// At the surface Nixplay doesn't support having multiple containers with
+	// the same name.
+	//
+	// HOWEVER I ran into some strange cases where testing where I ended up with
+	// multiple containers with the same name. After a little more digging I
+	// discovered that this constraint is only enforced on the client side when
+	// creating the containers. If you open two browsers it is possible to open
+	// two containers with the same time. This means we should be safe to having
+	// multiple containers with the same name.
+	//
+	// In addition when we attempt to decode the container name if we error out
+	// then we just take the un-decoded string to be the name of the container.
+	// This means if I created one container with the name "\\" that would
+	// decode to "\", and a second container with the name "\" that would fail
+	// to decode so we would just use the name "\". So we need to be safe to
+	// multiple containers with the same name for this reason too.
+
+	return cache.ElementsWithName(ctx, name)
+}
+
+func (c *DefaultClient) ContainerWithUniqueName(ctx context.Context, containerType types.ContainerType, name string) (Container, error) {
+	var cache *cache.Cache[Container]
+	switch containerType {
+	case types.AlbumContainerType:
+		cache = c.albumCache
+	case types.PlaylistContainerType:
+		cache = c.playlistCache
+	default:
+		return nil, types.ErrInvalidContainerType
 	}
 
-	// I did some checking and Nixplay doesn't support having multiple
-	// containers with the same name so we will error out if there are more than
-	// one container. If somehow this IS possible then I need to update this
-	// API.
-	if len(containers) > 1 {
-		return nil, errors.New("duplicate containers with the same name found")
-	}
-	if len(containers) == 1 {
-		return containers[0], nil
-	}
-	return nil, nil
+	return cache.ElementWithUniqueName(ctx, name)
 }
 
 func (c *DefaultClient) CreateContainer(ctx context.Context, containerType types.ContainerType, name string) (Container, error) {
+	name = encoding.Encode(name)
+
 	switch containerType {
 	case types.AlbumContainerType:
 		return c.createAlbum(ctx, name)
@@ -182,7 +201,7 @@ func (c *DefaultClient) createAlbum(ctx context.Context, name string) (Container
 		return nil, errors.New("incorrect number of created containers returned")
 	}
 
-	a := albums[0].ToContainer(c.client)
+	a := albums[0].ToContainer(c.client, c)
 	c.albumCache.Add(a)
 	return a, nil
 }
@@ -210,9 +229,9 @@ func (c *DefaultClient) createPlaylist(ctx context.Context, name string) (Contai
 
 	// Unfortunately the only data we get back is the playlist ID. So we will
 	// just assume that nixplay honored the exact name we asked it to create. I
-	// think this should be reasonably safe.
+	// think this should be reasonably safe given the encoding that we do.
 	nPhotos := int64(0)
-	p := newPlaylist(c.client, name, createResponse.PlaylistId, nPhotos)
+	p := newPlaylist(c.client, c, name, createResponse.PlaylistId, nPhotos)
 	c.playlistCache.Add(p)
 	return p, nil
 }

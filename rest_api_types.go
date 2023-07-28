@@ -10,10 +10,10 @@ import (
 
 type albumsResponse []nixplayAlbum
 
-func (albums albumsResponse) ToContainers(client httpx.Client) []Container {
+func (albums albumsResponse) ToContainers(client httpx.Client, nixplayClient Client) []Container {
 	containers := make([]Container, 0, len(albums))
 	for _, a := range albums {
-		containers = append(containers, a.ToContainer(client))
+		containers = append(containers, a.ToContainer(client, nixplayClient))
 	}
 	return containers
 }
@@ -24,16 +24,16 @@ type nixplayAlbum struct {
 	ID         uint64 `json:"id"`
 }
 
-func (a nixplayAlbum) ToContainer(client httpx.Client) Container {
-	return newAlbum(client, a.Title, a.ID, a.PhotoCount)
+func (a nixplayAlbum) ToContainer(client httpx.Client, nixplayClient Client) Container {
+	return newAlbum(client, nixplayClient, a.Title, a.ID, a.PhotoCount)
 }
 
 type playlistsResponse []playlistResponse
 
-func (playlists playlistsResponse) ToContainers(client httpx.Client) []Container {
+func (playlists playlistsResponse) ToContainers(client httpx.Client, nixplayClient Client) []Container {
 	containers := make([]Container, 0, len(playlists))
 	for _, p := range playlists {
-		containers = append(containers, p.ToContainer(client))
+		containers = append(containers, p.ToContainer(client, nixplayClient))
 	}
 	return containers
 }
@@ -44,8 +44,8 @@ type playlistResponse struct {
 	ID           uint64 `json:"id"`
 }
 
-func (p playlistResponse) ToContainer(client httpx.Client) Container {
-	return newPlaylist(client, p.Name, p.ID, p.PictureCount)
+func (p playlistResponse) ToContainer(client httpx.Client, nixplayClient Client) Container {
+	return newPlaylist(client, nixplayClient, p.Name, p.ID, p.PictureCount)
 }
 
 type createPlaylistRequest struct {

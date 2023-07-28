@@ -144,10 +144,11 @@ func addMyUploadsCleanup(t *testing.T, c Client) {
 
 func deleteAllPhotosFromMyUploads(t *testing.T, c Client) {
 	ctx := context.Background()
-	myUploads, err := c.Container(ctx, types.AlbumContainerType, "My Uploads")
+	myUploads, err := c.ContainersWithName(ctx, types.AlbumContainerType, "My Uploads")
+	require.Len(t, myUploads, 1)
 	require.NoError(t, err)
 
-	photos, err := myUploads.Photos(ctx)
+	photos, err := myUploads[0].Photos(ctx)
 	require.NoError(t, err)
 
 	for _, p := range photos {
@@ -228,9 +229,9 @@ func TestDefaultClient_Containers(t *testing.T) {
 			// Get
 			//////////////////////////
 			newName := "MyNewContainer"
-			container, err := client.Container(ctx, tc.containerType, newName)
+			containers, err = client.ContainersWithName(ctx, tc.containerType, newName)
 			assert.NoError(t, err)
-			assert.Equal(t, container, nil)
+			assert.Len(t, containers, 0)
 
 			//////////////////////////
 			// Create
@@ -274,10 +275,11 @@ func TestDefaultClient_Containers(t *testing.T) {
 			//////////////////////////
 			// Get
 			//////////////////////////
-			container, err = client.Container(ctx, tc.containerType, newName)
+			containers, err = client.ContainersWithName(ctx, tc.containerType, newName)
+			require.Len(t, containers, 1)
 			assert.NoError(t, err)
 
-			containerD, err := newContainerData(container)
+			containerD, err := newContainerData(containers[0])
 			assert.NoError(t, err)
 			assert.Equal(t, containerD, newContainerD)
 
@@ -299,9 +301,9 @@ func TestDefaultClient_Containers(t *testing.T) {
 			//////////////////////////
 			// Get
 			//////////////////////////
-			container, err = client.Container(ctx, tc.containerType, newName)
+			containers, err = client.ContainersWithName(ctx, tc.containerType, newName)
 			assert.NoError(t, err)
-			assert.Equal(t, container, nil)
+			assert.Len(t, containers, 0)
 
 			//////////////////////////
 			// Reset Cache and List
@@ -317,10 +319,139 @@ func TestDefaultClient_Containers(t *testing.T) {
 			// Reset Cache and Get
 			//////////////////////////
 			client.ResetCache()
-			container, err = client.Container(ctx, tc.containerType, newName)
+			containers, err = client.ContainersWithName(ctx, tc.containerType, newName)
 			assert.NoError(t, err)
-			assert.Equal(t, container, nil)
+			assert.Len(t, containers, 0)
 
+		})
+	}
+}
+
+func TestDefaultClient_DuplicateContainerName(t *testing.T) {
+	// See comments in ContainersWithName for details about how nixplay support
+	// for duplicate containers with same name.
+
+	type testData struct {
+		containerType types.ContainerType
+	}
+
+	tests := []testData{
+		{
+			containerType: types.AlbumContainerType,
+		},
+		{
+			containerType: types.PlaylistContainerType,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(string(tc.containerType), func(t *testing.T) {
+			ctx := context.Background()
+			client := testClient()
+
+			name := randomName()
+
+			//////////////////////////
+			// List
+			//////////////////////////
+			containers, err := client.ContainersWithName(ctx, tc.containerType, name)
+			assert.NoError(t, err)
+			assert.Empty(t, containers)
+
+			//xxx add in a testing for ContainerWithUniqueName in this test too
+
+			//////////////////////////
+			// Create First Container
+			//////////////////////////
+			container1, err := client.CreateContainer(ctx, tc.containerType, name)
+			assert.NoError(t, err)
+
+			actName, err := container1.Name(ctx)
+			assert.NoError(t, err)
+			assert.Equal(t, actName, name)
+
+			actUniqueName1, err := container1.NameUnique(ctx)
+			assert.NoError(t, err)
+			assert.Equal(t, actUniqueName1, name)
+
+			containers, err = client.ContainersWithName(ctx, tc.containerType, name)
+			assert.NoError(t, err)
+			assert.Equal(t, containers, []Container{container1})
+
+			//////////////////////////
+			// Create Second Container
+			//////////////////////////
+			container2, err := client.CreateContainer(ctx, tc.containerType, name)
+			assert.NoError(t, err)
+
+			actName, err = container2.Name(ctx)
+			assert.NoError(t, err)
+			assert.Equal(t, actName, name)
+
+			actName, err = container1.Name(ctx)
+			assert.NoError(t, err)
+			assert.Equal(t, actName, name)
+
+			actUniqueName2, err := container2.NameUnique(ctx)
+			assert.NoError(t, err)
+			assert.NotEqual(t, actUniqueName2, name)
+
+			actUniqueName1, err = container1.NameUnique(ctx)
+			assert.NoError(t, err)
+			assert.NotEqual(t, actUniqueName1, name)
+
+			assert.NotEqual(t, actUniqueName1, actUniqueName2)
+
+			getContainerIDs := func(containers []Container) []types.ID {
+				ids := make([]types.ID, 0, len(containers))
+				for _, c := range containers {
+					ids = append(ids, c.ID())
+				}
+				return ids
+			}
+
+			containers, err = client.ContainersWithName(ctx, tc.containerType, name)
+			assert.NoError(t, err)
+			assert.ElementsMatch(t, containers, []Container{container1, container2})
+			assert.ElementsMatch(t, getContainerIDs(containers), getContainerIDs([]Container{container1, container2}))
+
+			client.ResetCache()
+
+			containers, err = client.ContainersWithName(ctx, tc.containerType, name)
+			assert.NoError(t, err)
+			assert.ElementsMatch(t, getContainerIDs(containers), getContainerIDs([]Container{container1, container2}))
+
+			//////////////////////////
+			// Delete Second Container
+			//////////////////////////
+			assert.NoError(t, container2.Delete(ctx))
+
+			actName, err = container1.Name(ctx)
+			assert.NoError(t, err)
+			assert.Equal(t, actName, name)
+
+			actUniqueName1, err = container1.NameUnique(ctx)
+			assert.NoError(t, err)
+			assert.Equal(t, actUniqueName1, name)
+
+			containers, err = client.ContainersWithName(ctx, tc.containerType, name)
+			assert.NoError(t, err)
+			assert.ElementsMatch(t, getContainerIDs(containers), getContainerIDs([]Container{container1}))
+
+			//////////////////////////
+			// Delete First Container
+			//////////////////////////
+			assert.NoError(t, container1.Delete(ctx))
+
+			containers, err = client.ContainersWithName(ctx, tc.containerType, name)
+			assert.NoError(t, err)
+			assert.Empty(t, containers)
+
+			client.ResetCache()
+
+			containers, err = client.ContainersWithName(ctx, tc.containerType, name)
+			assert.NoError(t, err)
+			assert.Empty(t, containers)
 		})
 	}
 }
@@ -832,4 +963,138 @@ func TestDefaultClient_DuplicatePhotoNameInSameContainer(t *testing.T) {
 			assert.Empty(t, photos)
 		})
 	}
+}
+
+func TestDefaultClient_UnusualFileNames(t *testing.T) {
+	// TestDefaultClient_UnusualNames tests that we are able to handle a series
+	// of unusual names for the names of containers and images. The expectation
+	// is that if Nixplay is not able to handle these names then the names will
+	// be encoded so that on a round trip go-nixplay still sees them as the same
+	// name that was originally provided.
+
+	type testData struct {
+		description string
+		name        string
+	}
+
+	// This list of encoding decoding was originally pulled from the rclone
+	// encoding decode test suite and more cases where added such as unicode
+	// characters.
+	tests := []testData{
+		{"number", "1234"},
+		{"quote", `"`},
+		{"backslash", `\`},
+		{"control chars", "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0A\x0B\x0C\x0D\x0E\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F\x7F"},
+		{"dot", "."},
+		{"dot dot", ".."},
+		{"punctuation", "!\"#$%&'()*+,-./\\:;<=>?@[\\]^_`{|}~"},
+		{"leading trailing space", " space "},
+		{"leading trailing tilde", "~tilde~"},
+		{"leading trailing quote", `"quote"`},
+		{"leading trailing backslash", `\backslash\`},
+		{"leading trailing CR", "\rCR\r"},
+		{"leading trailing LF", "\nLF\n"},
+		{"leading trailing HT", "\tHT\t"},
+		{"leading trailing VT", "\vVT\v"},
+		{"leading trailing dot", ".dot."},
+		{"invalid UTF-8", "invalid utf-8\xfe"},
+		{"URL encoding", "test%46.txt"},
+		{"Japanese Kanji", "\u6f22\u5b57"},                                                  // Some Kanji from https://en.wikipedia.org/wiki/Kanji
+		{"Emoji", "\U0001f60a"},                                                             // SMILING FACE WITH SMILING EYES emoji
+		{"Full Width Characters", "\uff26\uff55\uff4c\uff4c\uff37\uff49\uff44\uff54\uff48"}, // "FullWidth" in full width characters
+	}
+
+	containerTypes := []types.ContainerType{
+		types.AlbumContainerType,
+		types.PlaylistContainerType,
+	}
+
+	ctx := context.Background()
+	client := testClient()
+
+	for _, ct := range containerTypes {
+		t.Run(string(ct), func(t *testing.T) {
+			for _, tt := range tests {
+				t.Run(tt.description, func(t *testing.T) {
+					container, err := client.CreateContainer(ctx, ct, tt.name)
+					require.NoError(t, err)
+					assert.NotNil(t, container)
+
+					actName, err := container.Name(ctx)
+					assert.NoError(t, err)
+					assert.Equal(t, actName, tt.name)
+
+					client.ResetCache()
+					containersFromSearch, err := client.ContainersWithName(ctx, ct, tt.name)
+					require.NoError(t, err)
+					require.Len(t, containersFromSearch, 1)
+					actName, err = containersFromSearch[0].Name(ctx)
+					assert.NoError(t, err)
+					assert.Equal(t, actName, tt.name)
+
+					err = container.Delete(ctx)
+					assert.NoError(t, err)
+				})
+			}
+		})
+	}
+
+	// We will only test uploading files to albums with the odd names because
+	// uploading to playlists should work the same way.
+	container := tempContainer(t, client, types.AlbumContainerType)
+
+	allTestPhotos, err := photos.AllPhotos()
+	require.NoError(t, err)
+	photoToUpload := allTestPhotos[0]
+
+	t.Run("photo", func(t *testing.T) {
+		for _, tt := range tests {
+			t.Run(tt.description, func(t *testing.T) {
+				r, err := photoToUpload.Open()
+				require.NoError(t, err)
+				defer func() {
+					err := r.Close()
+					assert.NoError(t, err)
+				}()
+
+				photoName := tt.name + ".jpg"
+
+				photo, err := container.AddPhoto(ctx, photoName, r, AddPhotoOptions{})
+				require.NoError(t, err)
+
+				defer func() {
+					err = photo.Delete(ctx)
+					assert.NoError(t, err)
+				}()
+
+				actName, err := photo.Name(ctx)
+				assert.NoError(t, err)
+				assert.Equal(t, actName, photoName)
+
+				actUniqueName, err := photo.NameUnique(ctx)
+				assert.NoError(t, err)
+				assert.Equal(t, actUniqueName, photoName)
+
+				container.ResetCache()
+				photosFromNameSearch, err := container.PhotosWithName(ctx, photoName)
+				require.NoError(t, err)
+				require.NotEmpty(t, photosFromNameSearch)
+				require.Len(t, photosFromNameSearch, 1)
+				photoFromNameSearch := photosFromNameSearch[0]
+
+				actName, err = photoFromNameSearch.Name(ctx)
+				assert.NoError(t, err)
+				assert.Equal(t, actName, photoName)
+
+				actUniqueName, err = photoFromNameSearch.NameUnique(ctx)
+				assert.NoError(t, err)
+				assert.Equal(t, actUniqueName, photoName)
+
+				photoFromUniqueNameSearch, err := container.PhotoWithUniqueName(ctx, photoName)
+				assert.NoError(t, err)
+				assert.NotNil(t, photoFromUniqueNameSearch)
+				assert.Equal(t, photoFromUniqueNameSearch, photoFromNameSearch)
+			})
+		}
+	})
 }

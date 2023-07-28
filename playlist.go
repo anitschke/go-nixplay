@@ -11,8 +11,8 @@ import (
 
 const playlistAddIDName = "playlistId"
 
-func newPlaylist(client httpx.Client, name string, nixplayID uint64, photoCount int64) *container {
-	return newContainer(client, types.PlaylistContainerType, name, nixplayID, photoCount, playlistPhotosPage, playlistDeleteRequest, playlistAddIDName)
+func newPlaylist(client httpx.Client, nixplayClient Client, name string, nixplayID uint64, photoCount int64) *container {
+	return newContainer(client, nixplayClient, types.PlaylistContainerType, name, nixplayID, photoCount, playlistPhotosPage, playlistDeleteRequest, playlistAddIDName)
 }
 
 func playlistDeleteRequest(ctx context.Context, nixplayID uint64) (*http.Request, error) {

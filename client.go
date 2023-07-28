@@ -44,11 +44,15 @@ type Client interface {
 	// Containers gets all containers of the specified ContainerType
 	Containers(ctx context.Context, containerType types.ContainerType) ([]Container, error)
 
-	// Container gets a container based on type and name.
+	// ContainersWithName gets a containers based on type and name.
 	//
-	// If the specified container could not be found then a nil container will
-	// be returned
-	Container(ctx context.Context, containerType types.ContainerType, name string) (Container, error)
+	// If no containers with the specified name could be found then an empty
+	// slice of containers will be returned.
+	ContainersWithName(ctx context.Context, containerType types.ContainerType, name string) ([]Container, error)
+
+	//xxx doc
+	//xxx test
+	ContainerWithUniqueName(ctx context.Context, containerType types.ContainerType, name string) (Container, error)
 
 	// CreateContainer creates a container of the specified type and name.
 	CreateContainer(ctx context.Context, containerType types.ContainerType, name string) (Container, error)
@@ -72,6 +76,11 @@ type Container interface {
 	ContainerType() types.ContainerType
 
 	Name(ctx context.Context) (string, error)
+	// NameUnique returns a name that has an additional unique ID appended to
+	// the end of the name if there are containers of the same type. If there
+	// are no containers with the same name and of the same type then NameUnique
+	// returns the same thing as Name.
+	NameUnique(ctx context.Context) (string, error)
 
 	// PhotoCount gets the number of photos within the container.
 	//
@@ -129,9 +138,10 @@ type Photo interface {
 
 	Name(ctx context.Context) (string, error)
 	// NameUnique returns a name that has an additional unique ID appended to
-	// the end name if there are photos with the same name in the container that
-	// this photo resides in. If there are no photos with the same name in the
-	// container then NameUnique returns the same thing as Name.
+	// the end of the name if there are photos with the same name in the
+	// container that this photo resides in. If there are no photos with the
+	// same name in the container then NameUnique returns the same thing as
+	// Name.
 	NameUnique(ctx context.Context) (string, error)
 	Size(ctx context.Context) (int64, error)
 	MD5Hash(ctx context.Context) (types.MD5Hash, error)

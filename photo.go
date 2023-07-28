@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/anitschke/go-nixplay/encoding"
 	"github.com/anitschke/go-nixplay/httpx"
 	"github.com/anitschke/go-nixplay/internal/cache"
 	"github.com/anitschke/go-nixplay/internal/errorx"
@@ -65,6 +66,16 @@ type photo struct {
 }
 
 func newPhoto(container Container, client httpx.Client, name string, md5Hash *types.MD5Hash, nixplayID uint64, nixplayPlaylistItemID string, size int64, url string) (retPhoto *photo, err error) {
+	// There is no guarantee that we will be able to successfully decode the
+	// name. The user may have manually created this with a name that does not
+	// mach up with our encoding schema. So if we get an error in encoding then
+	// just use the raw un-decoded string. This should be fine since we are safe
+	// to duplicate photos with the same name that could come about as a result
+	// of using the raw un-decoded string.
+	if decodedName, err := encoding.Decode(name); err == nil {
+		name = decodedName
+	}
+
 	defer errorx.WrapWithFuncNameIfError(&err)
 
 	// Based on current usage of newPhoto the MD5 hash should always be able to
