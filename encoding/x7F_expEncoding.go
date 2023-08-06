@@ -3,8 +3,6 @@
 
 package encoding
 
-// xxx doc
-
 // get_x7F_expEncoding
 //
 // It seems that there is some version dependent encoding in the Go standard
