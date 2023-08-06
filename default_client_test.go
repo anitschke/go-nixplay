@@ -1,7 +1,5 @@
 package nixplay
 
-//xxx fix typo in this file name and any other place we have this error "deafult -> default"
-
 import (
 	"bytes"
 	"context"

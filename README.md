@@ -21,7 +21,7 @@ storage provider to Nixplay.
 
 For info on using the library see the go [doc reference
 page](https://pkg.go.dev/github.com/anitschke/go-nixplay) or see
-[tests](./deafult_client_test.go) for an example.
+[tests](./default_client_test.go) for an example.
 
 ## Capabilities
 * List albums and playlists
