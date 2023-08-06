@@ -53,7 +53,7 @@ func TestEncoding(t *testing.T) {
 		{`control char \x1D`, "\x1D", `\x1d`},
 		{`control char \x1E`, "\x1E", `\x1e`},
 		{`control char \x1F`, "\x1F", `\x1f`},
-		{`control char \x7F`, "\x7F", `\x7f`},
+		{`control char \x7F`, "\x7F", get_x7F_expEncoding()},
 		{"dot", ".", "."},
 		{"dot dot", "..", ".."},
 		{`punctuation !`, `!`, `!`},
