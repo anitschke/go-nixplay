@@ -8,6 +8,8 @@ import (
 	"github.com/anitschke/go-nixplay/types"
 )
 
+//xxx add comment about encoding of names
+
 // AddPhotoOptions are optional arguments may be specified when adding photos to
 // Nixplay.
 type AddPhotoOptions struct {

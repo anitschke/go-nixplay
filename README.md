@@ -103,6 +103,9 @@ copies of photos to a playlist as this will likely result in unexpected
 behavior. At some point I may look into resolving this issue but I doubt many
 people will run into this issue/limitation.
 
+### Name Encoding
+//xxx add comment about encoding of names
+
 ## Testing
 This library contains tests to ensure that all APIs are working correctly. To
 make this possible a test Nixplay account needs to be used. At the start of
