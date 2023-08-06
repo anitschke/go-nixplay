@@ -140,12 +140,14 @@ type Photo interface {
 	ID() types.ID
 
 	Name(ctx context.Context) (string, error)
+
 	// NameUnique returns a name that has an additional unique ID appended to
 	// the end of the name if there are photos with the same name in the
 	// container that this photo resides in. If there are no photos with the
 	// same name in the container then NameUnique returns the same thing as
 	// Name.
 	NameUnique(ctx context.Context) (string, error)
+
 	Size(ctx context.Context) (int64, error)
 	MD5Hash(ctx context.Context) (types.MD5Hash, error)
 
