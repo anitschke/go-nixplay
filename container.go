@@ -126,7 +126,7 @@ func (c *container) NameUnique(ctx context.Context) (string, error) {
 		ids[other.ID()]++
 	}
 	if ids[c.ID()] > 1 {
-		return "", errors.New("failed to create unique ID for photo")
+		return "", errors.New("failed to create unique ID for container")
 	}
 
 	return c.GenerateUniqueName(ctx)

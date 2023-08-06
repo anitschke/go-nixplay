@@ -1,5 +1,7 @@
 package nixplay
 
+//xxx fix typo in this file name and any other place we have this error "deafult -> default"
+
 import (
 	"bytes"
 	"context"
@@ -358,7 +360,9 @@ func TestDefaultClient_DuplicateContainerName(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Empty(t, containers)
 
-			//xxx add in a testing for ContainerWithUniqueName in this test too
+			container, err := client.ContainerWithUniqueName(ctx, tc.containerType, name)
+			assert.NoError(t, err)
+			assert.Nil(t, container)
 
 			//////////////////////////
 			// Create First Container
@@ -378,11 +382,17 @@ func TestDefaultClient_DuplicateContainerName(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, containers, []Container{container1})
 
+			container, err = client.ContainerWithUniqueName(ctx, tc.containerType, name)
+			assert.NoError(t, err)
+			assert.Equal(t, container, container1)
+
 			//////////////////////////
 			// Create Second Container
 			//////////////////////////
 			container2, err := client.CreateContainer(ctx, tc.containerType, name)
 			assert.NoError(t, err)
+
+			assert.NotEqual(t, container1.ID(), container2.ID())
 
 			actName, err = container2.Name(ctx)
 			assert.NoError(t, err)
@@ -415,11 +425,35 @@ func TestDefaultClient_DuplicateContainerName(t *testing.T) {
 			assert.ElementsMatch(t, containers, []Container{container1, container2})
 			assert.ElementsMatch(t, getContainerIDs(containers), getContainerIDs([]Container{container1, container2}))
 
+			container, err = client.ContainerWithUniqueName(ctx, tc.containerType, name)
+			assert.NoError(t, err)
+			assert.Nil(t, container)
+
+			container, err = client.ContainerWithUniqueName(ctx, tc.containerType, actUniqueName1)
+			assert.NoError(t, err)
+			assert.Equal(t, container.ID(), container1.ID())
+
+			container, err = client.ContainerWithUniqueName(ctx, tc.containerType, actUniqueName2)
+			assert.NoError(t, err)
+			assert.Equal(t, container.ID(), container2.ID())
+
 			client.ResetCache()
 
 			containers, err = client.ContainersWithName(ctx, tc.containerType, name)
 			assert.NoError(t, err)
 			assert.ElementsMatch(t, getContainerIDs(containers), getContainerIDs([]Container{container1, container2}))
+
+			container, err = client.ContainerWithUniqueName(ctx, tc.containerType, name)
+			assert.NoError(t, err)
+			assert.Nil(t, container)
+
+			container, err = client.ContainerWithUniqueName(ctx, tc.containerType, actUniqueName1)
+			assert.NoError(t, err)
+			assert.Equal(t, container.ID(), container1.ID())
+
+			container, err = client.ContainerWithUniqueName(ctx, tc.containerType, actUniqueName2)
+			assert.NoError(t, err)
+			assert.Equal(t, container.ID(), container2.ID())
 
 			//////////////////////////
 			// Delete Second Container
@@ -438,6 +472,10 @@ func TestDefaultClient_DuplicateContainerName(t *testing.T) {
 			assert.NoError(t, err)
 			assert.ElementsMatch(t, getContainerIDs(containers), getContainerIDs([]Container{container1}))
 
+			container, err = client.ContainerWithUniqueName(ctx, tc.containerType, name)
+			assert.NoError(t, err)
+			assert.Equal(t, container.ID(), container1.ID())
+
 			//////////////////////////
 			// Delete First Container
 			//////////////////////////
@@ -452,6 +490,10 @@ func TestDefaultClient_DuplicateContainerName(t *testing.T) {
 			containers, err = client.ContainersWithName(ctx, tc.containerType, name)
 			assert.NoError(t, err)
 			assert.Empty(t, containers)
+
+			container, err = client.ContainerWithUniqueName(ctx, tc.containerType, name)
+			assert.NoError(t, err)
+			assert.Nil(t, container)
 		})
 	}
 }
