@@ -50,8 +50,11 @@ type Client interface {
 	// slice of containers will be returned.
 	ContainersWithName(ctx context.Context, containerType types.ContainerType, name string) ([]Container, error)
 
-	//xxx doc
-	//xxx test
+	// ContainerWithName gets the container based on type and unique name as
+	// returned by Container.NameUnique.
+	//
+	// If no container with the specified unique name could be found then a nil
+	// Container will be returned.
 	ContainerWithUniqueName(ctx context.Context, containerType types.ContainerType, name string) (Container, error)
 
 	// CreateContainer creates a container of the specified type and name.
