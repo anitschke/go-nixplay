@@ -3,6 +3,7 @@ package nixplay
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/binary"
 	"errors"
 	"io"
@@ -10,6 +11,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/anitschke/go-nixplay/encoding"
 	"github.com/anitschke/go-nixplay/httpx"
 	"github.com/anitschke/go-nixplay/internal/cache"
 	"github.com/anitschke/go-nixplay/internal/errorx"
@@ -39,8 +41,9 @@ type container struct {
 	photoCountMu sync.Mutex
 	photoCount   int64
 
-	client    httpx.Client
-	nixplayID uint64
+	client        httpx.Client
+	nixplayClient Client
+	nixplayID     uint64
 
 	photoCache             *cache.Cache[Photo]
 	elementDeletedListener []cache.ElementDeletedListener
@@ -50,7 +53,17 @@ type container struct {
 	addIDName         string
 }
 
-func newContainer(client httpx.Client, containerType types.ContainerType, name string, nixplayID uint64, photoCount int64, photoPageFunc photoPageFunc, deleteRequestFunc deleteRequestFunc, addIDName string) *container {
+func newContainer(client httpx.Client, nixplayClient Client, containerType types.ContainerType, name string, nixplayID uint64, photoCount int64, photoPageFunc photoPageFunc, deleteRequestFunc deleteRequestFunc, addIDName string) *container {
+
+	// There is no guarantee that we will be able to successfully decode the
+	// name. The user may have manually created this with a name that does not
+	// mach up with our encoding schema. So if we get an error in encoding then
+	// just use the raw un-decoded string. This should be fine since we are safe
+	// to duplicate containers with the same name that could come about as a
+	// result of using the raw un-decoded string.
+	if decodedName, err := encoding.Decode(name); err == nil {
+		name = decodedName
+	}
 
 	nixplayIdAsBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(nixplayIdAsBytes, nixplayID)
@@ -62,6 +75,7 @@ func newContainer(client httpx.Client, containerType types.ContainerType, name s
 	c := &container{
 		containerType:     containerType,
 		client:            client,
+		nixplayClient:     nixplayClient,
 		name:              name,
 		id:                id,
 		nixplayID:         nixplayID,
@@ -87,6 +101,51 @@ func (c *container) Name(ctx context.Context) (string, error) {
 	// While we don't need the context and won't ever produce an error we will
 	// still use this API so it has a consistent interface as Photo.Name().
 	return c.name, nil
+}
+
+func (c *container) NameUnique(ctx context.Context) (string, error) {
+	name, err := c.Name(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	allWithName, err := c.nixplayClient.ContainersWithName(ctx, c.containerType, name)
+	if err != nil {
+		return "", err
+	}
+	if len(allWithName) == 0 {
+		return "", errors.New("failed to find existing photo when creating unique name")
+	}
+	if len(allWithName) == 1 {
+		return name, nil
+	}
+
+	// Double check that we really can form a unique name.
+	ids := make(map[types.ID]int)
+	for _, other := range allWithName {
+		ids[other.ID()]++
+	}
+	if ids[c.ID()] > 1 {
+		return "", errors.New("failed to create unique ID for container")
+	}
+
+	return c.GenerateUniqueName(ctx)
+}
+
+// GenerateUniqueName is an internal function used to generate a name unique
+// name when we know there is another photo that shares the same "non-unique"
+// name.
+func (c *container) GenerateUniqueName(ctx context.Context) (string, error) {
+	name, err := c.Name(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	id := c.ID()
+	idString := base64.URLEncoding.EncodeToString(id[:])
+
+	uniqueName := name + "{" + idString + "}"
+	return uniqueName, nil
 }
 
 func (c *container) ID() types.ID {
@@ -164,6 +223,8 @@ func (c *container) photosPage(ctx context.Context, page uint64) ([]Photo, error
 }
 
 func (c *container) AddPhoto(ctx context.Context, name string, r io.Reader, opts AddPhotoOptions) (retPhoto Photo, err error) {
+	name = encoding.Encode(name)
+
 	defer errorx.WrapWithFuncNameIfError(&err)
 
 	albumID := uploadContainerID{

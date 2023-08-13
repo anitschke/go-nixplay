@@ -11,8 +11,8 @@ import (
 
 const albumAddIDName = "albumId"
 
-func newAlbum(client httpx.Client, name string, nixplayID uint64, photoCount int64) *container {
-	return newContainer(client, types.AlbumContainerType, name, nixplayID, photoCount, albumPhotosPage, albumDeleteRequest, albumAddIDName)
+func newAlbum(client httpx.Client, nixplayClient Client, name string, nixplayID uint64, photoCount int64) *container {
+	return newContainer(client, nixplayClient, types.AlbumContainerType, name, nixplayID, photoCount, albumPhotosPage, albumDeleteRequest, albumAddIDName)
 }
 
 func albumDeleteRequest(ctx context.Context, nixplayID uint64) (*http.Request, error) {

@@ -44,13 +44,24 @@ type Client interface {
 	// Containers gets all containers of the specified ContainerType
 	Containers(ctx context.Context, containerType types.ContainerType) ([]Container, error)
 
-	// Container gets a container based on type and name.
+	// ContainersWithName gets a containers based on type and name.
 	//
-	// If the specified container could not be found then a nil container will
-	// be returned
-	Container(ctx context.Context, containerType types.ContainerType, name string) (Container, error)
+	// If no containers with the specified name could be found then an empty
+	// slice of containers will be returned.
+	ContainersWithName(ctx context.Context, containerType types.ContainerType, name string) ([]Container, error)
+
+	// ContainerWithName gets the container based on type and unique name as
+	// returned by Container.NameUnique.
+	//
+	// If no container with the specified unique name could be found then a nil
+	// Container will be returned.
+	ContainerWithUniqueName(ctx context.Context, containerType types.ContainerType, name string) (Container, error)
 
 	// CreateContainer creates a container of the specified type and name.
+	//
+	// Note that the name of the container will be encoded before passing the
+	// name to Nixplay. See [README.md name-encoding](./README.md#name-encoding)
+	// for more details.
 	CreateContainer(ctx context.Context, containerType types.ContainerType, name string) (Container, error)
 
 	// Reset cache resets the internal cache of containers
@@ -72,6 +83,11 @@ type Container interface {
 	ContainerType() types.ContainerType
 
 	Name(ctx context.Context) (string, error)
+	// NameUnique returns a name that has an additional unique ID appended to
+	// the end of the name if there are containers of the same type. If there
+	// are no containers with the same name and of the same type then NameUnique
+	// returns the same thing as Name.
+	NameUnique(ctx context.Context) (string, error)
 
 	// PhotoCount gets the number of photos within the container.
 	//
@@ -100,6 +116,12 @@ type Container interface {
 	// https://github.com/anitschke/go-nixplay/#photo-additiondelete-is-not-atomic
 	// for further discussion of delete behavior.
 	Delete(ctx context.Context) error
+
+	// AddPhoto uploads a photo into the container.
+	//
+	// Note that the name of the container will be encoded before passing the
+	// name to Nixplay. See [README.md name-encoding](./README.md#name-encoding)
+	// for more details.
 	AddPhoto(ctx context.Context, name string, r io.Reader, opts AddPhotoOptions) (Photo, error)
 
 	// Reset cache resets the internal cache of photos
@@ -128,11 +150,14 @@ type Photo interface {
 	ID() types.ID
 
 	Name(ctx context.Context) (string, error)
+
 	// NameUnique returns a name that has an additional unique ID appended to
-	// the end name if there are photos with the same name in the container that
-	// this photo resides in. If there are no photos with the same name in the
-	// container then NameUnique returns the same thing as Name.
+	// the end of the name if there are photos with the same name in the
+	// container that this photo resides in. If there are no photos with the
+	// same name in the container then NameUnique returns the same thing as
+	// Name.
 	NameUnique(ctx context.Context) (string, error)
+
 	Size(ctx context.Context) (int64, error)
 	MD5Hash(ctx context.Context) (types.MD5Hash, error)
 

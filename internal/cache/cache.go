@@ -277,13 +277,6 @@ func (pc *Cache[T]) populateUniqueNameMapUnsafe(ctx context.Context) (err error)
 		}
 
 	}
-	for _, p := range pc.elements {
-		name, err := p.Name(ctx)
-		if err != nil {
-			return err
-		}
-		pc.nameToElements[name] = append(pc.nameToElements[name], p)
-	}
 	return nil
 }
 

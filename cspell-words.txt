@@ -1,3 +1,4 @@
+andrewjjenkins
 anitschk
 anitschke
 csrftoken
@@ -7,6 +8,7 @@ httpx
 mynixplay
 nixplay
 Nixplay
+picsync
 publicsuffix
 rclone
 stretchr
