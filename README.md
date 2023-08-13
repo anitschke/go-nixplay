@@ -104,7 +104,14 @@ behavior. At some point I may look into resolving this issue but I doubt many
 people will run into this issue/limitation.
 
 ### Name Encoding
-//xxx add comment about encoding of names
+Nixplay does not document any sort of API so we really don't have any guarantee
+of what sort of characters it supports for names of containers or files. I did
+some experimentation it seems like Nixplay has pretty good support but some
+non-ASCII characters like emoji don't work correctly. So in an effort to make
+sure things work correctly and will continue to work correctly we will be pretty
+aggressive with the encoding names of containers and files before uploading to
+Nixplay. Any non-ASCII or non-printable characters, along with backslashes (\)
+and double quotes ("), will be encoded using Go escape sequences.
 
 ## Testing
 This library contains tests to ensure that all APIs are working correctly. To

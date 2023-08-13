@@ -8,8 +8,6 @@ import (
 	"github.com/anitschke/go-nixplay/types"
 )
 
-//xxx add comment about encoding of names
-
 // AddPhotoOptions are optional arguments may be specified when adding photos to
 // Nixplay.
 type AddPhotoOptions struct {
@@ -60,6 +58,10 @@ type Client interface {
 	ContainerWithUniqueName(ctx context.Context, containerType types.ContainerType, name string) (Container, error)
 
 	// CreateContainer creates a container of the specified type and name.
+	//
+	// Note that the name of the container will be encoded before passing the
+	// name to Nixplay. See [README.md name-encoding](./README.md#name-encoding)
+	// for more details.
 	CreateContainer(ctx context.Context, containerType types.ContainerType, name string) (Container, error)
 
 	// Reset cache resets the internal cache of containers
@@ -114,6 +116,12 @@ type Container interface {
 	// https://github.com/anitschke/go-nixplay/#photo-additiondelete-is-not-atomic
 	// for further discussion of delete behavior.
 	Delete(ctx context.Context) error
+
+	// AddPhoto uploads a photo into the container.
+	//
+	// Note that the name of the container will be encoded before passing the
+	// name to Nixplay. See [README.md name-encoding](./README.md#name-encoding)
+	// for more details.
 	AddPhoto(ctx context.Context, name string, r io.Reader, opts AddPhotoOptions) (Photo, error)
 
 	// Reset cache resets the internal cache of photos
